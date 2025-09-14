@@ -10,7 +10,7 @@ A Python 3 tray application for Linux Mint (Cinnamon) using AppIndicator that sh
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/trayrunner.git
+git clone https://github.com/YOUR_USERNAME/trayrunner.git
 cd trayrunner
 
 # Run the installer
@@ -62,7 +62,7 @@ The easiest way to install TrayRunner is using the provided installation script:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/trayrunner.git
+git clone https://github.com/YOUR_USERNAME/trayrunner.git
 cd trayrunner
 
 # Run the installer
