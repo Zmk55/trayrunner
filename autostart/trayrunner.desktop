@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=TrayRunner
+Comment=System tray application for running custom commands
+Exec=python3 /home/tim/Documents/Scripts/Tasker/src/trayrunner/app.py
+Icon=/home/tim/Documents/Scripts/Tasker/src/trayrunner/icons/gear.ico
+X-GNOME-Autostart-enabled=true
+StartupNotify=false
+NoDisplay=false
+Hidden=false
+Categories=Utility;System;
+Keywords=tray;system;commands;menu;
