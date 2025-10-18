@@ -283,6 +283,35 @@ class TrayRunner:
         
         return Gtk.MenuItem(label="Invalid Item")
     
+    def _build_settings_submenu(self) -> Gtk.MenuItem:
+        """Build Settings submenu with housekeeping actions"""
+        settings_item = Gtk.MenuItem(label="Settings")
+        settings_menu = Gtk.Menu()
+        
+        # 1) Reload Config
+        reload_item = Gtk.MenuItem(label="Reload Config")
+        reload_item.connect("activate", self.reload_config)
+        settings_menu.append(reload_item)
+        
+        # 2) Open Config
+        open_config_item = Gtk.MenuItem(label="Open Config")
+        open_config_item.connect("activate", self.open_config)
+        settings_menu.append(open_config_item)
+        
+        # 3) Open Config GUI
+        open_gui_item = Gtk.MenuItem(label="Open Config GUI")
+        open_gui_item.connect("activate", self.open_config_gui)
+        settings_menu.append(open_gui_item)
+        
+        # 4) Show Log
+        show_log_item = Gtk.MenuItem(label="Show Log")
+        show_log_item.connect("activate", self.show_log)
+        settings_menu.append(show_log_item)
+        
+        settings_menu.show_all()
+        settings_item.set_submenu(settings_menu)
+        return settings_item
+    
     def build_menu(self, parent_window):
         """Build the main menu from config"""
         if self.menu:
@@ -299,25 +328,9 @@ class TrayRunner:
         # Add separator
         self.menu.append(Gtk.SeparatorMenuItem())
         
-        # Add utility menu items
-        reload_item = Gtk.MenuItem(label="Reload Config")
-        reload_item.connect("activate", self.reload_config)
-        self.menu.append(reload_item)
-        
-        open_config_item = Gtk.MenuItem(label="Open Config")
-        open_config_item.connect("activate", self.open_config)
-        self.menu.append(open_config_item)
-        
-        open_gui_item = Gtk.MenuItem(label="Open Config GUI")
-        open_gui_item.connect("activate", self.open_config_gui)
-        self.menu.append(open_gui_item)
-        
-        show_log_item = Gtk.MenuItem(label="Show Log")
-        show_log_item.connect("activate", self.show_log)
-        self.menu.append(show_log_item)
-        
-        # Add separator
-        self.menu.append(Gtk.SeparatorMenuItem())
+        # Add Settings submenu
+        settings_item = self._build_settings_submenu()
+        self.menu.append(settings_item)
         
         # Add quit item
         quit_item = Gtk.MenuItem(label="Quit")
