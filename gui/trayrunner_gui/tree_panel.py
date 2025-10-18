@@ -311,11 +311,11 @@ class TreePanel(QWidget):
             menu.addSeparator()
             
             duplicate_action = QAction("Duplicate", self)
-            duplicate_action.triggered.connect(lambda: self.duplicate_item(index))
+            duplicate_action.triggered.connect(self.duplicate_selected)
             menu.addAction(duplicate_action)
             
             delete_action = QAction("Delete", self)
-            delete_action.triggered.connect(lambda: self.delete_item(index))
+            delete_action.triggered.connect(self.delete_selected)
             menu.addAction(delete_action)
         
         menu.exec(self.tree_view.mapToGlobal(position))
@@ -364,6 +364,17 @@ class TreePanel(QWidget):
             if reply == QMessageBox.Yes:
                 self.model.remove_item(current)
                 self.data_changed.emit()
+    
+    def keyPressEvent(self, event):
+        """Handle keyboard events"""
+        from PySide6.QtGui import QKeySequence
+        
+        if event.matches(QKeySequence.Delete):
+            self.delete_selected()
+            event.accept()
+            return
+        
+        super().keyPressEvent(event)
     
     def filter_tree(self, text):
         """Filter tree based on search text"""
