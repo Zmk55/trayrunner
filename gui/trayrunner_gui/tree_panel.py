@@ -266,7 +266,7 @@ class TreePanel(QWidget):
     
     def setup_connections(self):
         """Setup signal connections"""
-        self.tree_view.selectionModel().selectionChanged.connect(self.on_selection_changed)
+        # Only connect non-model dependent signals here
         self.tree_view.customContextMenuRequested.connect(self.show_context_menu)
         self.search_edit.textChanged.connect(self.filter_tree)
     
@@ -274,6 +274,10 @@ class TreePanel(QWidget):
         """Set the configuration to display"""
         self.model = ConfigTreeModel(config)
         self.tree_view.setModel(self.model)
+        
+        # Connect selection model after model is set
+        if self.tree_view.selectionModel():
+            self.tree_view.selectionModel().selectionChanged.connect(self.on_selection_changed)
         
         # Expand all items
         self.tree_view.expandAll()
