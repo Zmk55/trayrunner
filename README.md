@@ -23,16 +23,19 @@ chmod +x TrayRunner-x86_64.AppImage
 ./TrayRunner-x86_64.AppImage
 ```
 
-This launches the **TrayRunner tray icon**. To open the Config GUI:
+This launches the **TrayRunner tray icon** in your system tray. To configure commands:
 1. Right-click the tray icon
-2. Select "Open Config GUI"
+2. Select **"Open Config GUI"**
+3. Edit your commands
+4. Click **"Reload TrayRunner"** to apply changes
+
+**Requirements**:
+- Python 3 with GTK support (pre-installed on most Linux systems)
+- For tray icons: `sudo apt install libayatana-appindicator3-1` (Debian/Ubuntu)
+
+**Tested on**: Ubuntu 20.04/22.04, Debian 11/12, Fedora 38+
 
 The AppImage includes both the core tray application and the GUI editor.
-
-**Optional**: For system tray integration on Debian/Ubuntu:
-```bash
-sudo apt install libayatana-appindicator3-1
-```
 
 ### Development Installation
 

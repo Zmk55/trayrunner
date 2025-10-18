@@ -18,6 +18,8 @@ import fcntl
 import tempfile
 import argparse
 import time
+
+__version__ = "1.0.0"
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 
@@ -360,13 +362,18 @@ class TrayRunner:
         import sys
         import shutil
         
-        # 1) When running as AppImage, APPDIR is set
         appdir = os.environ.get("APPDIR")
+        
+        # 1) When running as AppImage, APPDIR is set
         if appdir:
             candidate = os.path.join(appdir, "usr", "bin", name)
             if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
                 logging.info(f"Found {name} in AppImage: {candidate}")
                 return candidate
+            else:
+                # Diagnostic: GUI binary missing from AppImage
+                logging.warning(f"{name} not found in AppImage at {candidate}")
+                logging.warning(f"APPDIR={appdir}, checking if file exists: {os.path.isfile(candidate)}")
         
         # 2) Next to the running binary (PyInstaller onefile/unpacked)
         here = os.path.dirname(os.path.realpath(sys.argv[0]))
@@ -384,6 +391,7 @@ class TrayRunner:
     def open_config_gui(self, widget):
         """Open configuration GUI editor"""
         import subprocess
+        import os
         
         exe = self._find_gui_binary("trayrunner-gui")
         if exe:
@@ -395,13 +403,16 @@ class TrayRunner:
                 logging.error(f"Failed to open GUI: {e}")
                 self.command_runner._notify("TrayRunner Error", f"Failed to open GUI: {e}")
         else:
-            logging.error("trayrunner-gui not found in AppImage or system PATH")
-            self.command_runner._notify(
-                "TrayRunner GUI Not Found",
-                "Could not locate 'trayrunner-gui' inside the AppImage or on PATH.\n"
-                "If not using AppImage, install with: pipx install .[gui]",
-                "normal"
-            )
+            appdir = os.environ.get("APPDIR", "not set")
+            logging.error(f"trayrunner-gui not found. APPDIR={appdir}")
+            
+            # Better error message
+            if appdir != "not set":
+                msg = f"GUI binary missing from AppImage.\nAPPDIR={appdir}\nPlease download the complete AppImage."
+            else:
+                msg = "Could not locate 'trayrunner-gui'.\nIf not using AppImage, install with: pipx install .[gui]"
+            
+            self.command_runner._notify("TrayRunner GUI Not Found", msg, "normal")
     
     def check_reload_trigger(self):
         """Check for reload trigger file and reload if found"""
@@ -500,6 +511,7 @@ def check_single_instance():
 def main():
     """Main entry point"""
     parser = argparse.ArgumentParser(description="TrayRunner - System tray application with customizable menus")
+    parser.add_argument("--version", action="version", version=f"TrayRunner {__version__}")
     parser.add_argument("--reload", action="store_true", help="Reload configuration of running TrayRunner instance")
     args = parser.parse_args()
     

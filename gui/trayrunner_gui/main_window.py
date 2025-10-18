@@ -452,13 +452,32 @@ class MainWindow(QMainWindow):
         QMessageBox.information(self, "Preferences", "Preferences dialog not yet implemented.")
     
     def show_about(self):
-        """Show about dialog"""
-        QMessageBox.about(
-            self, "About TrayRunner Config Editor",
-            "TrayRunner Config Editor v1.1.0\n\n"
-            "A GUI editor for TrayRunner configuration files.\n\n"
-            "Built with PySide6, ruamel.yaml, and pydantic."
-        )
+        """Show about dialog with system info"""
+        import os
+        import sys
+        import shutil
+        from PySide6.QtCore import __version__ as qt_version
+        
+        appdir = os.environ.get("APPDIR", "Not running from AppImage")
+        core_path = shutil.which("trayrunner") or "Not found"
+        gui_path = sys.executable
+        
+        info = f"""TrayRunner Config GUI
+        
+Version: 1.0.0
+
+Paths:
+- Core app: {core_path}
+- GUI app: {gui_path}
+- APPDIR: {appdir}
+
+Environment:
+- Qt: {qt_version}
+- Python: {sys.version.split()[0]}
+
+Built with PySide6, ruamel.yaml, and pydantic."""
+        
+        QMessageBox.about(self, "About TrayRunner", info)
     
     def on_selection_changed(self, node_data):
         """Handle selection change in tree"""

@@ -9,14 +9,7 @@ rm -rf build dist AppDir TrayRunner-x86_64.AppImage squashfs-root
 # Install build dependencies
 pip install pyinstaller
 
-# 1) Build BOTH binaries with PyInstaller
-echo "Building core tray application..."
-pyinstaller --name trayrunner \
-    --onefile \
-    --noconfirm \
-    --clean \
-    src/trayrunner/app.py
-
+# 1) Build ONLY GUI with PyInstaller (core uses source + wrapper)
 echo "Building GUI editor..."
 pyinstaller --name trayrunner-gui \
     --onefile \
@@ -37,12 +30,23 @@ mkdir -p AppDir/usr/share/applications
 mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
 mkdir -p AppDir/usr/share/trayrunner
 
-# 3) Install both binaries
-install -m755 dist/trayrunner AppDir/usr/bin/trayrunner
+# 3) Install GUI binary + copy core source files
 install -m755 dist/trayrunner-gui AppDir/usr/bin/trayrunner-gui
-
-# 4) Copy additional resources
+cp -r src/trayrunner AppDir/usr/share/trayrunner/
 cp -r config AppDir/usr/share/trayrunner/
+
+# 4) Create wrapper script for core tray app
+cat > AppDir/usr/bin/trayrunner << 'EOF'
+#!/bin/bash
+# TrayRunner core wrapper - uses system Python with GTK
+HERE="$(dirname "$(readlink -f "${0}")")"
+cd "$HERE/../share/trayrunner"
+exec python3 trayrunner/app.py "$@"
+EOF
+chmod +x AppDir/usr/bin/trayrunner
+
+# Make sure the script is executable and has proper shebang
+sed -i '1s|^|#!/bin/bash\n|' AppDir/usr/bin/trayrunner
 
 # 5) Create desktop file (points to trayrunner, not GUI)
 # Always include icon since linuxdeploy expects it
@@ -153,9 +157,8 @@ if command -v qmake >/dev/null 2>&1; then
     
     # Try with Qt plugin
     echo "Attempting to bundle Qt libraries..."
-    # Build linuxdeploy command with optional icon
+    # Build linuxdeploy command with optional icon - only analyze GUI binary
     LINUXDEPLOY_CMD="./linuxdeploy-x86_64.AppImage --appdir AppDir \
-        --executable AppDir/usr/bin/trayrunner \
         --executable AppDir/usr/bin/trayrunner-gui \
         --desktop-file AppDir/usr/share/applications/trayrunner.desktop"
     
@@ -176,9 +179,8 @@ if command -v qmake >/dev/null 2>&1; then
     fi
 else
     echo "qmake not found, bundling without Qt plugin..."
-    # Build linuxdeploy command with optional icon
+    # Build linuxdeploy command with optional icon - only analyze GUI binary
     LINUXDEPLOY_CMD="./linuxdeploy-x86_64.AppImage --appdir AppDir \
-        --executable AppDir/usr/bin/trayrunner \
         --executable AppDir/usr/bin/trayrunner-gui \
         --desktop-file AppDir/usr/share/applications/trayrunner.desktop"
     
@@ -196,6 +198,31 @@ mv TrayRunner-*.AppImage TrayRunner-x86_64.AppImage || true
 
 # 11) Generate SHA256SUMS
 sha256sum TrayRunner-x86_64.AppImage > SHA256SUMS
+
+# 12) Sanity checks
+echo "Running sanity checks..."
+if [[ -f "TrayRunner-x86_64.AppImage" ]]; then
+    echo "✓ AppImage created"
+    
+    # Check both binaries exist in AppDir
+    if [[ -x "AppDir/usr/bin/trayrunner" ]] && [[ -x "AppDir/usr/bin/trayrunner-gui" ]]; then
+        echo "✓ Both binaries present and executable"
+    else
+        echo "✗ Missing binaries in AppDir"
+        exit 1
+    fi
+    
+    # Check AppRun points to trayrunner (either symlink or script content)
+    if readlink AppDir/AppRun 2>/dev/null | grep -q "trayrunner" || grep -q "trayrunner" AppDir/AppRun; then
+        echo "✓ AppRun points to core tray app"
+    else
+        echo "✗ AppRun misconfigured"
+        exit 1
+    fi
+else
+    echo "✗ AppImage build failed"
+    exit 1
+fi
 
 echo "AppImage built successfully: TrayRunner-x86_64.AppImage"
 echo "SHA256: $(cat SHA256SUMS)"
