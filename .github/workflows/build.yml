@@ -40,16 +40,16 @@ jobs:
       
       - name: Verify AppImage
         run: |
-          ls -lh trayrunner-gui-x86_64.AppImage
+          ls -lh TrayRunner-x86_64.AppImage
           cat SHA256SUMS
-          file trayrunner-gui-x86_64.AppImage
+          file TrayRunner-x86_64.AppImage
       
       - name: Upload AppImage artifact
         uses: actions/upload-artifact@v3
         with:
-          name: trayrunner-gui-appimage
+          name: trayrunner-appimage
           path: |
-            trayrunner-gui-x86_64.AppImage
+            TrayRunner-x86_64.AppImage
             SHA256SUMS
       
       - name: Create Release
@@ -57,11 +57,11 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            trayrunner-gui-x86_64.AppImage
+            TrayRunner-x86_64.AppImage
             SHA256SUMS
           generate_release_notes: true
           body: |
-            ## TrayRunner Config GUI v${{ github.ref_name }}
+            ## TrayRunner v${{ github.ref_name }}
             
             ### Downloads
             - **AppImage**: Self-contained executable for Linux
@@ -69,9 +69,11 @@ jobs:
             
             ### Installation
             ```bash
-            chmod +x trayrunner-gui-x86_64.AppImage
-            ./trayrunner-gui-x86_64.AppImage
+            chmod +x TrayRunner-x86_64.AppImage
+            ./TrayRunner-x86_64.AppImage
             ```
+            
+            This launches the TrayRunner tray icon. To open the config editor, right-click the tray icon and select "Open Config GUI".
             
             ### Requirements
             - Linux system (Ubuntu 20.04+, Debian 11+)
@@ -86,14 +88,14 @@ jobs:
       - name: Download AppImage
         uses: actions/download-artifact@v3
         with:
-          name: trayrunner-gui-appimage
+          name: trayrunner-appimage
       
       - name: Test AppImage launches
         run: |
-          chmod +x trayrunner-gui-x86_64.AppImage
+          chmod +x TrayRunner-x86_64.AppImage
           # Test help/version if implemented
-          timeout 5s ./trayrunner-gui-x86_64.AppImage --version || true
+          timeout 5s ./TrayRunner-x86_64.AppImage --version || true
           
           # Verify executable
-          file trayrunner-gui-x86_64.AppImage
-          ldd trayrunner-gui-x86_64.AppImage || true
+          file TrayRunner-x86_64.AppImage
+          ldd TrayRunner-x86_64.AppImage || true

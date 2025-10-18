@@ -14,14 +14,20 @@ Download and run - no installation required:
 
 ```bash
 # Download latest release
-wget https://github.com/Zmk55/trayrunner/releases/latest/download/trayrunner-gui-x86_64.AppImage
+wget https://github.com/Zmk55/trayrunner/releases/latest/download/TrayRunner-x86_64.AppImage
 
 # Make executable
-chmod +x trayrunner-gui-x86_64.AppImage
+chmod +x TrayRunner-x86_64.AppImage
 
-# Run
-./trayrunner-gui-x86_64.AppImage
+# Run (launches the TrayRunner tray icon)
+./TrayRunner-x86_64.AppImage
 ```
+
+This launches the **TrayRunner tray icon**. To open the Config GUI:
+1. Right-click the tray icon
+2. Select "Open Config GUI"
+
+The AppImage includes both the core tray application and the GUI editor.
 
 **Optional**: For system tray integration on Debian/Ubuntu:
 ```bash
