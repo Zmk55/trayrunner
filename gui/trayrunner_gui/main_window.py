@@ -327,11 +327,25 @@ class MainWindow(QMainWindow):
             self.update_window_title()
             self.update_status()
             
-            # Show backup info
-            self.status_bar.showMessage(f"Saved. Backup created: {backup_path.name}", 3000)
-            
-        except Exception as e:
-            QMessageBox.critical(self, "Save Error", f"Failed to save configuration: {e}")
+        # Show backup info
+        self.status_bar.showMessage(f"Saved. Backup created: {backup_path.name}", 3000)
+        
+        # Auto-reload if enabled in preferences
+        from ..models.preferences import load_prefs
+        from ..services.reloader import try_reload
+        
+        prefs = load_prefs()
+        if prefs.get("reload_after_save", True):
+            # Non-blocking reload with status update
+            ok, msg = try_reload()
+            if ok:
+                self.status_bar.showMessage(f"Saved & reloaded: {msg}", 4000)
+            else:
+                # Show warning but don't block - reload is optional
+                self.status_bar.showMessage(f"Saved (reload warning: {msg})", 6000)
+        
+    except Exception as e:
+        QMessageBox.critical(self, "Save Error", f"Failed to save configuration: {e}")
     
     def save_as_config(self):
         """Save configuration to new file"""
@@ -448,8 +462,44 @@ class MainWindow(QMainWindow):
     
     def show_preferences(self):
         """Show preferences dialog"""
-        # TODO: Implement preferences dialog
-        QMessageBox.information(self, "Preferences", "Preferences dialog not yet implemented.")
+        from PySide6.QtWidgets import QDialog, QVBoxLayout, QCheckBox, QDialogButtonBox
+        from ..models.preferences import load_prefs, save_prefs
+        
+        # Create dialog
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Preferences")
+        dialog.setMinimumWidth(400)
+        
+        layout = QVBoxLayout()
+        
+        # Load current preferences
+        prefs = load_prefs()
+        
+        # Reload after save checkbox
+        reload_checkbox = QCheckBox("Reload TrayRunner after Save")
+        reload_checkbox.setChecked(prefs.get("reload_after_save", True))
+        reload_checkbox.setToolTip(
+            "Automatically reload the TrayRunner tray menu after saving configuration changes.\n"
+            "If disabled, you'll need to manually click 'Reload Config' from the tray menu."
+        )
+        layout.addWidget(reload_checkbox)
+        
+        # Add stretch to push buttons to bottom
+        layout.addStretch()
+        
+        # Dialog buttons
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+        
+        dialog.setLayout(layout)
+        
+        # Show dialog and save if accepted
+        if dialog.exec() == QDialog.Accepted:
+            prefs["reload_after_save"] = reload_checkbox.isChecked()
+            save_prefs(prefs)
+            self.status_bar.showMessage("Preferences saved", 2000)
     
     def show_about(self):
         """Show about dialog with system info"""

@@ -78,6 +78,9 @@ class YAMLHandler:
             temp_path = path.with_suffix('.tmp')
             with open(temp_path, 'w', encoding='utf-8') as f:
                 self.yaml.dump(new_data, f)
+                f.flush()
+                import os
+                os.fsync(f.fileno())  # Ensure data is written to disk
             
             # Move temp file to final location
             shutil.move(str(temp_path), str(path))
