@@ -5,6 +5,12 @@ Pydantic schema models for TrayRunner configuration
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Literal, Dict, Union, Annotated
 from enum import Enum
+from uuid import uuid4
+
+
+def generate_node_id() -> str:
+    """Generate a unique node ID"""
+    return str(uuid4())
 
 
 class NodeType(str, Enum):
@@ -17,6 +23,7 @@ class NodeType(str, Enum):
 class ItemNode(BaseModel):
     """Configuration item node"""
     type: Literal["item"] = "item"
+    id: str = Field(default_factory=generate_node_id, description="Unique node identifier")
     label: str = Field(..., description="Display name for the menu item")
     cmd: str = Field(..., description="Command to execute")
     terminal: bool = Field(False, description="Run command in terminal")
@@ -41,6 +48,7 @@ class ItemNode(BaseModel):
 class GroupNode(BaseModel):
     """Configuration group node (submenu)"""
     type: Literal["group"] = "group"
+    id: str = Field(default_factory=generate_node_id, description="Unique node identifier")
     label: str = Field(..., description="Display name for the submenu")
     items: List["Node"] = Field(default_factory=list, description="Items in this group")
     
@@ -55,6 +63,7 @@ class GroupNode(BaseModel):
 class SeparatorNode(BaseModel):
     """Configuration separator node"""
     type: Literal["separator"] = "separator"
+    id: str = Field(default_factory=generate_node_id, description="Unique node identifier")
 
 
 # Forward reference for Node union type with discriminated union

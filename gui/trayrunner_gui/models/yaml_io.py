@@ -64,8 +64,11 @@ class YAMLHandler:
         backup_path = self.create_backup(path)
         
         try:
-            # Convert config to dict
+            # Convert config to dict, excluding 'id' fields
             data = config.model_dump()
+            
+            # Recursively remove 'id' from nested structures
+            data = self._remove_ids_recursive(data)
             
             # If we have original YAML, try to preserve comments
             if original_yaml is not None:
@@ -92,6 +95,14 @@ class YAMLHandler:
             if backup_path.exists():
                 shutil.copy2(backup_path, path)
             raise ValueError(f"Failed to save YAML to {path}: {e}")
+    
+    def _remove_ids_recursive(self, data):
+        """Recursively remove 'id' fields from data structure"""
+        if isinstance(data, dict):
+            return {k: self._remove_ids_recursive(v) for k, v in data.items() if k != 'id'}
+        elif isinstance(data, list):
+            return [self._remove_ids_recursive(item) for item in data]
+        return data
     
     def create_backup(self, path: Path) -> Path:
         """
