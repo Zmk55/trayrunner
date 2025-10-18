@@ -3,7 +3,7 @@ Pydantic schema models for TrayRunner configuration
 """
 
 from pydantic import BaseModel, Field, field_validator
-from typing import Optional, List, Literal, Dict, Union
+from typing import Optional, List, Literal, Dict, Union, Annotated
 from enum import Enum
 
 
@@ -57,8 +57,8 @@ class SeparatorNode(BaseModel):
     type: Literal["separator"] = "separator"
 
 
-# Forward reference for Node union type
-Node = Union[ItemNode, GroupNode, SeparatorNode]
+# Forward reference for Node union type with discriminated union
+Node = Annotated[Union[ItemNode, GroupNode, SeparatorNode], Field(discriminator='type')]
 
 # Update forward references
 GroupNode.model_rebuild()

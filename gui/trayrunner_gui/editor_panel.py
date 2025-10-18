@@ -318,7 +318,7 @@ class EditorPanel(QWidget):
             self.group_editor.set_group(node_data)
             self.stacked_widget.setCurrentWidget(self.group_editor)
             
-        elif isinstance(node_data, dict) and node_data.get("type") == "separator":
+        elif isinstance(node_data, SeparatorNode):
             self.title_label.setText("Separator")
             self.stacked_widget.setCurrentWidget(self.separator_editor)
             

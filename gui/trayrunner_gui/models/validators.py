@@ -3,7 +3,7 @@ Configuration validation logic
 """
 
 from typing import List, Tuple, Set
-from .schema import Config, Node, ItemNode, GroupNode, ValidationError
+from .schema import Config, Node, ItemNode, GroupNode, SeparatorNode, ValidationError
 
 
 class ConfigValidator:
@@ -51,14 +51,15 @@ class ConfigValidator:
             self._validate_item(node, path)
         elif isinstance(node, GroupNode):
             self._validate_group(node, path)
-        elif isinstance(node, dict) and node.get("type") == "separator":
-            # Separator nodes are always valid
+        elif isinstance(node, SeparatorNode):
+            # Separator nodes are always valid, no properties to validate
             pass
         else:
+            # This should never happen with discriminated union
             self.errors.append(ValidationError(
                 type="error",
                 location=path,
-                message=f"Unknown node type: {type(node)}",
+                message=f"Unknown node type: {type(node).__name__}",
                 field="type"
             ))
     

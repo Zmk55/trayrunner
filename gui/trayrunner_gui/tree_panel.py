@@ -97,7 +97,7 @@ class ConfigTreeModel(QAbstractItemModel):
                 return f"📄 {node.label}"
             elif isinstance(node, GroupNode):
                 return f"📁 {node.label}"
-            elif isinstance(node, dict) and node.get("type") == "separator":
+            elif isinstance(node, SeparatorNode):
                 return "--- Separator ---"
         
         elif role == Qt.DecorationRole:
@@ -105,7 +105,7 @@ class ConfigTreeModel(QAbstractItemModel):
                 return "📄"
             elif isinstance(node, GroupNode):
                 return "📁"
-            elif isinstance(node, dict) and node.get("type") == "separator":
+            elif isinstance(node, SeparatorNode):
                 return "---"
         
         return None
@@ -189,7 +189,7 @@ class ConfigTreeModel(QAbstractItemModel):
         if not parent_index.isValid():
             # Add to root
             self.beginInsertRows(QModelIndex(), len(self.root_items), len(self.root_items))
-            new_separator = {"type": "separator"}
+            new_separator = SeparatorNode()
             self.root_items.append(new_separator)
             self.endInsertRows()
         else:
@@ -197,7 +197,7 @@ class ConfigTreeModel(QAbstractItemModel):
             parent_node = parent_index.internalPointer()
             if isinstance(parent_node, GroupNode):
                 self.beginInsertRows(parent_index, len(parent_node.items), len(parent_node.items))
-                new_separator = {"type": "separator"}
+                new_separator = SeparatorNode()
                 parent_node.items.append(new_separator)
                 self.endInsertRows()
         
