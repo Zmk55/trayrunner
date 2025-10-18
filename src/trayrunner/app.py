@@ -347,23 +347,59 @@ class TrayRunner:
         else:
             self.command_runner._notify("TrayRunner", "No log file found")
     
+    def _find_gui_binary(self, name: str = "trayrunner-gui"):
+        """
+        Find GUI binary in AppImage or system PATH
+        
+        Search order:
+        1. Inside APPDIR (when running as AppImage)
+        2. Next to the running binary (PyInstaller onefile)
+        3. System PATH (development/installed)
+        """
+        import os
+        import sys
+        import shutil
+        
+        # 1) When running as AppImage, APPDIR is set
+        appdir = os.environ.get("APPDIR")
+        if appdir:
+            candidate = os.path.join(appdir, "usr", "bin", name)
+            if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+                logging.info(f"Found {name} in AppImage: {candidate}")
+                return candidate
+        
+        # 2) Next to the running binary (PyInstaller onefile/unpacked)
+        here = os.path.dirname(os.path.realpath(sys.argv[0]))
+        candidate = os.path.join(here, name)
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+            logging.info(f"Found {name} next to binary: {candidate}")
+            return candidate
+        
+        # 3) Fallback to system PATH
+        candidate = shutil.which(name)
+        if candidate:
+            logging.info(f"Found {name} on system PATH: {candidate}")
+        return candidate
+
     def open_config_gui(self, widget):
         """Open configuration GUI editor"""
-        import shutil
         import subprocess
         
-        # Try to find trayrunner-gui executable
-        exe = shutil.which("trayrunner-gui")
+        exe = self._find_gui_binary("trayrunner-gui")
         if exe:
             try:
                 subprocess.Popen([exe], start_new_session=True)
                 self.command_runner._notify("TrayRunner", "Config GUI opened")
+                logging.info(f"Launched GUI from: {exe}")
             except Exception as e:
+                logging.error(f"Failed to open GUI: {e}")
                 self.command_runner._notify("TrayRunner Error", f"Failed to open GUI: {e}")
         else:
+            logging.error("trayrunner-gui not found in AppImage or system PATH")
             self.command_runner._notify(
                 "TrayRunner GUI Not Found",
-                "Install with: pipx install .[gui] or pip install .[gui]",
+                "Could not locate 'trayrunner-gui' inside the AppImage or on PATH.\n"
+                "If not using AppImage, install with: pipx install .[gui]",
                 "normal"
             )
     

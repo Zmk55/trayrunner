@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=TrayRunner
+Comment=System tray application with customizable menus
+Exec=trayrunner
+Icon=trayrunner
+Categories=Utility;
+Terminal=false
+StartupNotify=false
+X-AppImage-Integrate=true
