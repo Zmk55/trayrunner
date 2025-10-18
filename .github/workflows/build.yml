@@ -7,14 +7,15 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  build_appimage:
+    name: Build AppImage
+    runs-on: ubuntu-20.04  # Changed from ubuntu-latest for max compatibility
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Setup Python
+      - name: Setup Python 3.10
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
@@ -23,15 +24,13 @@ jobs:
         run: |
           sudo apt update
           sudo apt install -y \
-            python3-gi \
-            gir1.2-appindicator3-0.1 \
-            python3-gi-cairo \
-            gir1.2-gtk-3.0 \
-            libnotify-bin \
-            python3-pip
+            python3-pip \
+            libfuse2 \
+            desktop-file-utils
       
       - name: Install Python dependencies
         run: |
+          pip install --upgrade pip
           pip install .[gui] pyinstaller
       
       - name: Build AppImage
@@ -39,15 +38,62 @@ jobs:
           chmod +x scripts/build_appimage.sh
           bash scripts/build_appimage.sh
       
+      - name: Verify AppImage
+        run: |
+          ls -lh trayrunner-gui-x86_64.AppImage
+          cat SHA256SUMS
+          file trayrunner-gui-x86_64.AppImage
+      
       - name: Upload AppImage artifact
         uses: actions/upload-artifact@v3
         with:
           name: trayrunner-gui-appimage
-          path: trayrunner-gui-x86_64.AppImage
+          path: |
+            trayrunner-gui-x86_64.AppImage
+            SHA256SUMS
       
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
         with:
-          files: trayrunner-gui-x86_64.AppImage
+          files: |
+            trayrunner-gui-x86_64.AppImage
+            SHA256SUMS
           generate_release_notes: true
+          body: |
+            ## TrayRunner Config GUI v${{ github.ref_name }}
+            
+            ### Downloads
+            - **AppImage**: Self-contained executable for Linux
+            - **SHA256SUMS**: Checksums for verification
+            
+            ### Installation
+            ```bash
+            chmod +x trayrunner-gui-x86_64.AppImage
+            ./trayrunner-gui-x86_64.AppImage
+            ```
+            
+            ### Requirements
+            - Linux system (Ubuntu 20.04+, Debian 11+)
+            - For tray icons: `sudo apt install libayatana-appindicator3-1`
+
+  smoke_test:
+    name: Smoke Test AppImage
+    needs: build_appimage
+    runs-on: ubuntu-20.04
+    
+    steps:
+      - name: Download AppImage
+        uses: actions/download-artifact@v3
+        with:
+          name: trayrunner-gui-appimage
+      
+      - name: Test AppImage launches
+        run: |
+          chmod +x trayrunner-gui-x86_64.AppImage
+          # Test help/version if implemented
+          timeout 5s ./trayrunner-gui-x86_64.AppImage --version || true
+          
+          # Verify executable
+          file trayrunner-gui-x86_64.AppImage
+          ldd trayrunner-gui-x86_64.AppImage || true

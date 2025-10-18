@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=TrayRunner Config Editor
+Comment=GUI editor for TrayRunner configuration
+Exec=trayrunner-gui
+Icon=trayrunner-gui
+Categories=Utility;
+Keywords=config;editor;tray;menu;
+Terminal=false

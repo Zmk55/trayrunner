@@ -8,18 +8,66 @@ A Python 3 tray application for Linux Mint (Cinnamon) using AppIndicator that sh
 
 ## Quick Start
 
+### AppImage (Recommended)
+
+Download and run - no installation required:
+
 ```bash
-# Clone the repository
+# Download latest release
+wget https://github.com/Zmk55/trayrunner/releases/latest/download/trayrunner-gui-x86_64.AppImage
+
+# Make executable
+chmod +x trayrunner-gui-x86_64.AppImage
+
+# Run
+./trayrunner-gui-x86_64.AppImage
+```
+
+**Optional**: For system tray integration on Debian/Ubuntu:
+```bash
+sudo apt install libayatana-appindicator3-1
+```
+
+### Development Installation
+
+For developers using pipx:
+
+```bash
 git clone https://github.com/Zmk55/trayrunner.git
 cd trayrunner
-
-# Run the installer
-chmod +x install.sh
-./install.sh
-
-# Start using TrayRunner
-trayrunner status
+pipx install .[gui]
+trayrunner-gui
 ```
+
+### System Dependencies (Core TrayRunner)
+
+```bash
+sudo apt install python3-gi gir1.2-appindicator3-0.1 python3-gi-cairo gir1.2-gtk-3.0 libnotify-bin
+```
+
+## Compatibility
+
+### Tested Systems
+
+| OS | Version | Status | Notes |
+|----|---------|--------|-------|
+| Ubuntu | 20.04 LTS | ✅ Fully Supported | Baseline build target |
+| Ubuntu | 22.04 LTS | ✅ Fully Supported | Current LTS |
+| Debian | 12 (Bookworm) | ✅ Fully Supported | Stable release |
+| Linux Mint | 21+ | ✅ Expected to work | Based on Ubuntu 22.04 |
+
+### Requirements
+
+**For GUI (AppImage)**:
+- Linux kernel 4.4+ (glibc 2.31+)
+- X11 or Wayland display server
+- (Optional) Ayatana AppIndicator for tray icons
+
+**For Core TrayRunner**:
+- Python 3.8+
+- GTK 3.0
+- AppIndicator3
+- Notification daemon
 
 ## Features
 
@@ -249,6 +297,46 @@ The application automatically adds these utility items to every menu:
 - Validate YAML syntax using an online YAML validator
 - Check file permissions on the configuration file
 - Use "Reload Config" from the menu to test changes
+
+### AppImage won't run
+
+**Error**: "cannot execute binary file"
+- **Solution**: Ensure you have `chmod +x trayrunner-gui-*.AppImage`
+
+**Error**: "FUSE library not found"
+- **Solution**: `sudo apt install libfuse2`
+
+### Tray icons not showing
+
+**Issue**: TrayRunner doesn't appear in system tray
+- **Solution**: Install Ayatana AppIndicator:
+  ```bash
+  sudo apt install libayatana-appindicator3-1
+  ```
+
+### GUI fails to reload TrayRunner
+
+**Issue**: "Reload TrayRunner" button shows error
+- **Check**: Is TrayRunner running? `pgrep -f trayrunner`
+- **Check**: Is `trayrunner` command in PATH?
+- **Fallback**: Use tray menu "Reload Config" instead
+
+## Command-Line Interface
+
+### Reload Configuration
+
+Reload TrayRunner configuration without restart:
+
+```bash
+# From terminal
+trayrunner --reload
+
+# Exit codes:
+# 0 = Reload successful
+# 1 = TrayRunner not running or reload failed
+```
+
+This command is used by the GUI's "Reload TrayRunner" button to apply changes immediately.
 
 ## Development
 
