@@ -18,6 +18,7 @@ import fcntl
 import tempfile
 import argparse
 import time
+import shutil
 
 __version__ = "1.0.0"
 from pathlib import Path
@@ -238,6 +239,19 @@ class TrayRunner:
         # Setup reload trigger file path
         self.reload_trigger_file = Path.home() / ".local" / "state" / "trayrunner" / "reload.trigger"
         self.reload_trigger_file.parent.mkdir(parents=True, exist_ok=True)
+    
+    def _gui_log_path(self):
+        """Get path to GUI launch log file"""
+        log_dir = Path.home() / ".local" / "state" / "trayrunner"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        return log_dir / "gui-launch.log"
+    
+    def _log_gui_launch(self, message, level="INFO"):
+        """Log GUI launch messages"""
+        log_path = self._gui_log_path()
+        timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(f"{timestamp} {level} {message}\n")
         
         # Notifications are already initialized at module level
     
@@ -371,61 +385,115 @@ class TrayRunner:
         2. Next to the running binary (PyInstaller onefile)
         3. System PATH (development/installed)
         """
-        import os
-        import sys
-        import shutil
-        
         appdir = os.environ.get("APPDIR")
         
         # 1) When running as AppImage, APPDIR is set
         if appdir:
             candidate = os.path.join(appdir, "usr", "bin", name)
             if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
-                logging.info(f"Found {name} in AppImage: {candidate}")
+                self._log_gui_launch(f"Found {name} in AppImage: {candidate}")
                 return candidate
             else:
                 # Diagnostic: GUI binary missing from AppImage
-                logging.warning(f"{name} not found in AppImage at {candidate}")
-                logging.warning(f"APPDIR={appdir}, checking if file exists: {os.path.isfile(candidate)}")
+                self._log_gui_launch(f"{name} not found in AppImage: {candidate}", "WARN")
         
         # 2) Next to the running binary (PyInstaller onefile/unpacked)
         here = os.path.dirname(os.path.realpath(sys.argv[0]))
         candidate = os.path.join(here, name)
         if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
-            logging.info(f"Found {name} next to binary: {candidate}")
+            self._log_gui_launch(f"Found {name} next to binary: {candidate}")
             return candidate
         
         # 3) Fallback to system PATH
         candidate = shutil.which(name)
         if candidate:
-            logging.info(f"Found {name} on system PATH: {candidate}")
-        return candidate
+            self._log_gui_launch(f"Found {name} on system PATH: {candidate}")
+            return candidate
+        
+        self._log_gui_launch(f"{name} not found anywhere", "ERROR")
+        return None
 
     def open_config_gui(self, widget):
-        """Open configuration GUI editor"""
-        import subprocess
-        import os
+        """Launch or raise the config GUI with error handling"""
+        self._log_gui_launch("Launch request received")
         
+        # Find GUI executable
         exe = self._find_gui_binary("trayrunner-gui")
-        if exe:
+        if not exe:
+            log_path = self._gui_log_path()
+            self.command_runner._notify(
+                "TrayRunner GUI Not Found",
+                f"trayrunner-gui not found. Install with 'pipx install .[gui]' or use the AppImage build.\nLog: {log_path}"
+            )
+            return
+        
+        # Try to raise existing instance first (fast path)
+        try:
+            result = subprocess.run(
+                [exe, "--raise-only"],
+                timeout=0.2,
+                capture_output=True
+            )
+            if result.returncode == 0:
+                self._log_gui_launch("Existing GUI instance raised successfully")
+                return
+        except subprocess.TimeoutExpired:
+            self._log_gui_launch("--raise-only timed out, proceeding to launch", "WARN")
+        except Exception as e:
+            self._log_gui_launch(f"--raise-only failed: {e}", "WARN")
+        
+        # Launch new GUI instance
+        self._log_gui_launch(f"Launching new GUI instance from: {exe}")
+        
+        # Prepare environment
+        env = os.environ.copy()
+        if "APPDIR" in env:
+            # Ensure Qt plugins work in AppImage context
+            env.setdefault("QT_DEBUG_PLUGINS", "0")
+        
+        try:
+            # Launch as detached process
+            proc = subprocess.Popen(
+                [exe],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=env,
+                start_new_session=True  # Detach from parent
+            )
+            
+            # Wait briefly to catch immediate failures
             try:
-                subprocess.Popen([exe], start_new_session=True)
-                self.command_runner._notify("TrayRunner", "Config GUI opened")
-                logging.info(f"Launched GUI from: {exe}")
-            except Exception as e:
-                logging.error(f"Failed to open GUI: {e}")
-                self.command_runner._notify("TrayRunner Error", f"Failed to open GUI: {e}")
-        else:
-            appdir = os.environ.get("APPDIR", "not set")
-            logging.error(f"trayrunner-gui not found. APPDIR={appdir}")
+                rc = proc.wait(timeout=1.0)
+                out, err = proc.stdout.read(), proc.stderr.read()
+                
+                if rc == 0 and not out and not err:
+                    # Clean exit, likely singleton detection worked
+                    self._log_gui_launch("GUI exited cleanly (existing instance)")
+                    return
+                
+                if rc != 0:
+                    # Failed to start
+                    stderr_text = err.decode('utf-8', 'ignore')
+                    self._log_gui_launch(f"GUI failed to start (exit {rc})", "ERROR")
+                    self._log_gui_launch(f"STDERR:\n{stderr_text}", "ERROR")
+                    
+                    log_path = self._gui_log_path()
+                    self.command_runner._notify(
+                        "TrayRunner GUI Failed",
+                        f"GUI exited with code {rc}. Check log:\n{log_path}"
+                    )
+                    return
             
-            # Better error message
-            if appdir != "not set":
-                msg = f"GUI binary missing from AppImage.\nAPPDIR={appdir}\nPlease download the complete AppImage."
-            else:
-                msg = "Could not locate 'trayrunner-gui'.\nIf not using AppImage, install with: pipx install .[gui]"
-            
-            self.command_runner._notify("TrayRunner GUI Not Found", msg, "normal")
+            except subprocess.TimeoutExpired:
+                # Still running after 1 second, that's good
+                self._log_gui_launch("GUI started successfully (running in background)")
+        
+        except Exception as e:
+            self._log_gui_launch(f"Failed to launch GUI: {e}", "ERROR")
+            self.command_runner._notify(
+                "TrayRunner GUI Error",
+                f"Failed to launch GUI: {e}"
+            )
     
     def check_reload_trigger(self):
         """Check for reload trigger file and reload if found"""

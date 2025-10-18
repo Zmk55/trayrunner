@@ -99,6 +99,9 @@ class MainWindow(QMainWindow):
         self.config_path: Optional[Path] = None
         self.original_yaml = None
         self.has_unsaved_changes = False
+        
+        # Store singleton server reference (set by app.py)
+        self._singleton_server = None
         self.file_watcher: Optional[ConfigFileWatcher] = None
         
         # Load settings
@@ -327,25 +330,25 @@ class MainWindow(QMainWindow):
             self.update_window_title()
             self.update_status()
             
-        # Show backup info
-        self.status_bar.showMessage(f"Saved. Backup created: {backup_path.name}", 3000)
+            # Show backup info
+            self.status_bar.showMessage(f"Saved. Backup created: {backup_path.name}", 3000)
+            
+            # Auto-reload if enabled in preferences
+            from ..models.preferences import load_prefs
+            from ..services.reloader import try_reload
+            
+            prefs = load_prefs()
+            if prefs.get("reload_after_save", True):
+                # Non-blocking reload with status update
+                ok, msg = try_reload()
+                if ok:
+                    self.status_bar.showMessage(f"Saved & reloaded: {msg}", 4000)
+                else:
+                    # Show warning but don't block - reload is optional
+                    self.status_bar.showMessage(f"Saved (reload warning: {msg})", 6000)
         
-        # Auto-reload if enabled in preferences
-        from ..models.preferences import load_prefs
-        from ..services.reloader import try_reload
-        
-        prefs = load_prefs()
-        if prefs.get("reload_after_save", True):
-            # Non-blocking reload with status update
-            ok, msg = try_reload()
-            if ok:
-                self.status_bar.showMessage(f"Saved & reloaded: {msg}", 4000)
-            else:
-                # Show warning but don't block - reload is optional
-                self.status_bar.showMessage(f"Saved (reload warning: {msg})", 6000)
-        
-    except Exception as e:
-        QMessageBox.critical(self, "Save Error", f"Failed to save configuration: {e}")
+        except Exception as e:
+            QMessageBox.critical(self, "Save Error", f"Failed to save configuration: {e}")
     
     def save_as_config(self):
         """Save configuration to new file"""
