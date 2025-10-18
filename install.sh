@@ -169,6 +169,10 @@ show_usage() {
     echo -e "${GREEN}Logs are stored at:${NC}"
     echo "  ~/.local/state/trayrunner/run.log"
     echo ""
+    echo -e "${GREEN}To install the GUI editor:${NC}"
+    echo "  pip3 install --user .[gui]"
+    echo "  or: pipx install .[gui]"
+    echo ""
     echo -e "${BLUE}Enjoy using TrayRunner!${NC}"
 }
 

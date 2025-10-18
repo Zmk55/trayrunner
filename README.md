@@ -41,6 +41,44 @@ trayrunner status
   - Open configuration in default editor
   - View execution logs
   - Graceful quit
+- **Config GUI Editor** (NEW!):
+  - Visual tree editor with drag-and-drop
+  - Live validation with error highlighting
+  - Comment and formatting preservation
+  - Automatic backup management
+  - Integrated reload functionality
+  - File change monitoring
+
+## Config GUI
+
+TrayRunner now includes a modern GUI editor for configuration files! No more manual YAML editing required.
+
+### Quick Start with GUI
+
+```bash
+# Install TrayRunner with GUI support
+pip install .[gui]
+
+# Or use pipx for isolated installation
+pipx install .[gui]
+
+# Launch the GUI
+trayrunner-gui
+
+# Or launch from tray menu
+# Right-click tray icon → "Open Config GUI"
+```
+
+### GUI Features
+
+- **Visual Editor**: Tree-based interface for menu structure
+- **Live Validation**: Real-time error checking and suggestions
+- **Smart Backup**: Automatic timestamped backups on save
+- **Reload Integration**: One-click TrayRunner configuration reload
+- **File Watching**: Detects external changes to your config
+- **Modern UI**: Clean interface with theme support
+
+For detailed GUI documentation, see [gui/README.md](gui/README.md).
 
 ## Requirements
 

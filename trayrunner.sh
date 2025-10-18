@@ -49,18 +49,23 @@ case "$1" in
         rm -f "$AUTOSTART_FILE"
         echo "Autostart disabled."
         ;;
+    reload)
+        echo "Reloading TrayRunner configuration..."
+        python3 "$APP_PATH" --reload
+        ;;
     version)
         echo "TrayRunner v$VERSION"
         echo "A Python 3 tray application for Linux using AppIndicator"
         ;;
     *)
-        echo "Usage: $0 {start|stop|restart|status|version|enable-autostart|disable-autostart}"
+        echo "Usage: $0 {start|stop|restart|status|reload|version|enable-autostart|disable-autostart}"
         echo ""
         echo "Commands:"
         echo "  start           - Start TrayRunner"
         echo "  stop            - Stop TrayRunner"
         echo "  restart         - Restart TrayRunner"
         echo "  status          - Check if TrayRunner is running"
+        echo "  reload          - Reload TrayRunner configuration"
         echo "  version         - Show version information"
         echo "  enable-autostart - Enable automatic startup on login"
         echo "  disable-autostart- Disable automatic startup on login"

@@ -16,6 +16,8 @@ import yaml
 import logging
 import fcntl
 import tempfile
+import argparse
+import time
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 
@@ -231,6 +233,10 @@ class TrayRunner:
         self.menu = None
         self.indicator = None
         
+        # Setup reload trigger file path
+        self.reload_trigger_file = Path.home() / ".local" / "state" / "trayrunner" / "reload.trigger"
+        self.reload_trigger_file.parent.mkdir(parents=True, exist_ok=True)
+        
         # Notifications are already initialized at module level
     
     def create_icon(self) -> GdkPixbuf.Pixbuf:
@@ -300,6 +306,10 @@ class TrayRunner:
         open_config_item.connect("activate", self.open_config)
         self.menu.append(open_config_item)
         
+        open_gui_item = Gtk.MenuItem(label="Open Config GUI")
+        open_gui_item.connect("activate", self.open_config_gui)
+        self.menu.append(open_gui_item)
+        
         show_log_item = Gtk.MenuItem(label="Show Log")
         show_log_item.connect("activate", self.show_log)
         self.menu.append(show_log_item)
@@ -336,6 +346,40 @@ class TrayRunner:
                 subprocess.run(["xdg-open", str(self.command_runner.log_file)])
         else:
             self.command_runner._notify("TrayRunner", "No log file found")
+    
+    def open_config_gui(self, widget):
+        """Open configuration GUI editor"""
+        import shutil
+        import subprocess
+        
+        # Try to find trayrunner-gui executable
+        exe = shutil.which("trayrunner-gui")
+        if exe:
+            try:
+                subprocess.Popen([exe], start_new_session=True)
+                self.command_runner._notify("TrayRunner", "Config GUI opened")
+            except Exception as e:
+                self.command_runner._notify("TrayRunner Error", f"Failed to open GUI: {e}")
+        else:
+            self.command_runner._notify(
+                "TrayRunner GUI Not Found",
+                "Install with: pipx install .[gui] or pip install .[gui]",
+                "normal"
+            )
+    
+    def check_reload_trigger(self):
+        """Check for reload trigger file and reload if found"""
+        if self.reload_trigger_file.exists():
+            try:
+                # Remove trigger file first
+                self.reload_trigger_file.unlink()
+                # Reload configuration
+                self.reload_config(None)
+                return True
+            except Exception as e:
+                logging.error(f"Failed to process reload trigger: {e}")
+                return False
+        return False
     
     def run(self):
         """Start the application"""
@@ -378,6 +422,15 @@ class TrayRunner:
             
             print("TrayRunner is now running. Look for the icon in your system tray!")
             
+            # Setup reload trigger timer (check every 2 seconds)
+            def check_reload():
+                self.check_reload_trigger()
+                return True  # Continue timer
+            
+            # Use GLib.timeout_add instead of Gtk.timeout_add
+            from gi.repository import GLib
+            GLib.timeout_add(2000, check_reload)  # 2000ms = 2 seconds
+            
             # Start main loop
             Gtk.main()
             
@@ -410,6 +463,35 @@ def check_single_instance():
 
 def main():
     """Main entry point"""
+    parser = argparse.ArgumentParser(description="TrayRunner - System tray application with customizable menus")
+    parser.add_argument("--reload", action="store_true", help="Reload configuration of running TrayRunner instance")
+    args = parser.parse_args()
+    
+    if args.reload:
+        # Handle reload request
+        reload_trigger_file = Path.home() / ".local" / "state" / "trayrunner" / "reload.trigger"
+        reload_trigger_file.parent.mkdir(parents=True, exist_ok=True)
+        
+        try:
+            # Create trigger file
+            reload_trigger_file.write_text(str(int(time.time())))
+            print("Reload signal sent to TrayRunner")
+            
+            # Wait briefly for reload to complete
+            time.sleep(1)
+            
+            # Check if trigger file was processed (removed)
+            if not reload_trigger_file.exists():
+                print("Configuration reloaded successfully")
+                sys.exit(0)
+            else:
+                print("TrayRunner may not be running or failed to reload")
+                sys.exit(1)
+                
+        except Exception as e:
+            print(f"Failed to send reload signal: {e}")
+            sys.exit(1)
+    
     # Check for single instance
     if not check_single_instance():
         print("TrayRunner is already running!")
