@@ -473,7 +473,7 @@ class ConfigTreeModel(QAbstractItemModel):
         Returns:
             Mutable list of children
         """
-        if parent_node is self.root or parent_node == "ROOT":
+        if parent_node is None or parent_node == "ROOT":
             count = len(self.root_items)
             self.model_log.debug(f"children_of(ROOT) -> {count} items")
             return self.root_items
@@ -747,7 +747,7 @@ class TreePanel(QWidget):
                 parent_id = parent_node.id if parent_node else "ROOT"
                 parent_type = type(parent_node).__name__ if parent_node else "None"
             else:
-                parent_node = self.model.root
+                parent_node = None  # Root level
                 parent_id = "ROOT"
                 parent_type = "Root"
             
