@@ -38,7 +38,9 @@ python -m trayrunner_gui.app
 |------|--------------|
 | `src/trayrunner/` | Tray app (system tray, config reload logic) |
 | `gui/trayrunner_gui/` | Config GUI (Qt/PySide6) |
+| `tools/` | Developer tools (linuxdeploy, helpers) |
 | `scripts/` | Build scripts and packaging helpers |
+| `tests/` | Test suite (pytest) |
 | `build_appimage/` | Output directory for AppImage builds |
 | `~/.config/trayrunner/commands.yaml` | User config file |
 
@@ -56,35 +58,31 @@ sudo apt install -y python3 python3-venv python3-pip rsync patchelf file wget fu
 
 ### ⚙️ Setup linuxdeploy + Qt Plugin
 ```bash
-mkdir -p tools && cd tools
-wget -O linuxdeploy-x86_64.AppImage https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
-wget -O linuxdeploy-plugin-qt-x86_64.AppImage https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
-chmod +x linuxdeploy-*.AppImage
-cd ..
+# Download linuxdeploy tools automatically
+bash tools/helpers/fetch_linuxdeploy.sh
+
+# Or use the Makefile
+make tools
 ```
 
 ### 🏗️ Build Commands
 ```bash
-# Clean
-rm -rf build_appimage dist
-
-# Freeze the GUI (PyInstaller)
-python -m pip install --upgrade pip pyinstaller
-pyinstaller gui/trayrunner_gui/app.py --name trayrunner-gui --onefile --noconfirm
-
-# Run full build script
+# Using the build script (recommended)
 ./scripts/build_appimage.sh
+
+# Or using the Makefile
+make appimage
 ```
 
 The resulting AppImage will be in:
 ```
-build_appimage/out/TrayRunner-x86_64.AppImage
+build_appimage/out/TrayRunner-$(uname -m).AppImage
 ```
 
 ### ✅ Test Run
 ```bash
-chmod +x build_appimage/out/TrayRunner-x86_64.AppImage
-./build_appimage/out/TrayRunner-x86_64.AppImage
+chmod +x build_appimage/out/TrayRunner-$(uname -m).AppImage
+./build_appimage/out/TrayRunner-$(uname -m).AppImage
 ```
 
 ---
@@ -115,6 +113,19 @@ chmod +x build_appimage/out/TrayRunner-x86_64.AppImage
 
 ## 🧪 Testing & Logging
 
+### Running Tests
+```bash
+# Run all tests
+pytest tests/ -v
+
+# Or use the Makefile
+make test
+
+# Run specific test
+pytest tests/test_yaml_roundtrip.py -v
+```
+
+### Debug Logging
 - Tray logs → `~/.local/state/trayrunner/run.log`
 - GUI logs → `~/.local/state/trayrunner/gui-debug.log`
 - Run GUI in debug mode:
