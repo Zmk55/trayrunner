@@ -222,6 +222,13 @@ class MainWindow(QMainWindow):
         self.delete_action.triggered.connect(self.delete_item)
         edit_menu.addAction(self.delete_action)
         
+        edit_menu.addSeparator()
+        
+        # Add "Edit YAML" action
+        self.edit_yaml_action = QAction("Edit &YAML", self)
+        self.edit_yaml_action.triggered.connect(self.open_yaml_file)
+        edit_menu.addAction(self.edit_yaml_action)
+        
         # Tools menu
         tools_menu = menubar.addMenu("&Tools")
         
@@ -563,6 +570,29 @@ Built with PySide6, ruamel.yaml, and pydantic."""
             subprocess.Popen(["xdg-open", log_path])
         except Exception as e:
             QMessageBox.warning(self, "Cannot Open Log", f"Failed to open log file:\n{log_path}\n\nError: {e}")
+    
+    def open_yaml_file(self):
+        """Open ~/.config/trayrunner/commands.yaml in system text editor"""
+        import subprocess
+        import os
+        
+        config_path = os.path.expanduser("~/.config/trayrunner/commands.yaml")
+        
+        if os.path.exists(config_path):
+            try:
+                subprocess.Popen(["xdg-open", config_path])
+            except Exception as e:
+                QMessageBox.warning(
+                    self,
+                    "Cannot Open YAML",
+                    f"Failed to open YAML file:\n{config_path}\n\nError: {e}"
+                )
+        else:
+            QMessageBox.warning(
+                self,
+                "File Not Found",
+                f"Config file not found:\n{config_path}"
+            )
     
     def on_selection_changed(self, node_data):
         """Handle selection change in tree"""

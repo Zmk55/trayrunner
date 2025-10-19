@@ -107,7 +107,7 @@ chmod +x build_appimage/out/TrayRunner-$(uname -m).AppImage
 ```
 3. Test both AppImages (`x86_64`, `aarch64`) locally.
 4. Upload to GitHub Releases with `SHA256SUMS`.
-5. Verify tray → Settings → Open Config GUI works.
+5. Verify tray → Settings → Edit Config works.
 
 ---
 

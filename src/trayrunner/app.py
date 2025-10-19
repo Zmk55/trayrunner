@@ -322,20 +322,17 @@ class TrayRunner:
         reload_item.connect("activate", self.reload_config)
         settings_menu.append(reload_item)
         
-        # 2) Open Config
-        open_config_item = Gtk.MenuItem(label="Open Config")
-        open_config_item.connect("activate", self.open_config)
-        settings_menu.append(open_config_item)
+        # 2) Edit Config (renamed from "Open Config GUI")
+        edit_config_item = Gtk.MenuItem(label="Edit Config")
+        edit_config_item.connect("activate", self.open_config_gui)
+        settings_menu.append(edit_config_item)
         
-        # 3) Open Config GUI
-        open_gui_item = Gtk.MenuItem(label="Open Config GUI")
-        open_gui_item.connect("activate", self.open_config_gui)
-        settings_menu.append(open_gui_item)
-        
-        # 4) Show Log
+        # 3) Show Log
         show_log_item = Gtk.MenuItem(label="Show Log")
         show_log_item.connect("activate", self.show_log)
         settings_menu.append(show_log_item)
+        
+        # Removed: "Open Config" entry (raw YAML opening from tray)
         
         settings_menu.show_all()
         settings_item.set_submenu(settings_menu)
@@ -491,7 +488,7 @@ class TrayRunner:
 
     def open_config_gui(self, widget):
         """Launch or raise the config GUI with error handling"""
-        self._log_gui_launch("Launch request received")
+        self._log_gui_launch("Edit Config triggered from tray menu")
         
         # Find GUI executable
         exe = self._find_gui_binary("trayrunner-gui")

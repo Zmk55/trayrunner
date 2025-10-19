@@ -20,7 +20,7 @@ chmod +x TrayRunner-x86_64.AppImage
 ```
 
 ### Configure
-Right-click the tray icon → **Settings → Open Config GUI**
+Right-click the tray icon → **Settings → Edit Config**
 
 ## ✅ Tested Systems
 
