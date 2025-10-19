@@ -54,7 +54,7 @@ class ConfigLoader:
     
     def __init__(self):
         self.config_dir = Path.home() / ".config" / "trayrunner"
-        self.default_config = Path(__file__).parent.parent.parent / "config" / "commands.yaml"
+        self.default_config = Path(__file__).parent.parent.parent / "config" / "default.yaml"
         self.user_config = self.config_dir / "commands.yaml"
         
     def ensure_user_config(self):

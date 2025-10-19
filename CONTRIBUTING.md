@@ -43,6 +43,8 @@ python -m trayrunner_gui.app
 | `tests/` | Test suite (pytest) |
 | `build_appimage/` | Output directory for AppImage builds |
 | `~/.config/trayrunner/commands.yaml` | User config file |
+| `config/default.yaml` | Default template config |
+| `config/test.yaml` | Personal testing config (ignored by git) |
 
 ---
 
