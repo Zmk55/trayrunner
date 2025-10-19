@@ -1,226 +1,165 @@
 # Contributing to TrayRunner
 
-Thank you for your interest in contributing to TrayRunner! This guide will help you get started with development.
+## 🧭 Overview
+This document helps developers understand how to contribute to **TrayRunner** — whether you're fixing a bug, improving the Config GUI, or building the AppImage.
 
-## 🛠️ Development Setup
+---
 
-### Prerequisites
+## 💻 Development Setup
 
-- Python 3.8+
-- Git
-- System dependencies (see below)
+### Requirements
+- Linux (Ubuntu 20.04+ preferred)
+- Python 3.9 or newer
+- `virtualenv` or `venv`
+- `git`
+- Optional: Docker (for isolated testing)
 
-### System Dependencies
-
+### 1️⃣ Clone and Setup
 ```bash
-# Ubuntu/Debian/Mint
-sudo apt install python3-gi gir1.2-appindicator3-0.1 python3-gi-cairo gir1.2-gtk-3.0 libnotify-bin
-
-# For GUI development
-sudo apt install python3-pip
-```
-
-### Development Installation
-
-```bash
-# Clone the repository
 git clone https://github.com/Zmk55/trayrunner.git
 cd trayrunner
-
-# Install in development mode with GUI support
-pip install -e .[gui]
-
-# Run the core application
-trayrunner
-
-# Run the GUI editor
-trayrunner-gui
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
-## 🏗️ Building AppImage
-
-To build the AppImage for distribution:
-
+### 2️⃣ Run Locally
+Run the tray app or the config GUI independently:
 ```bash
-# Install build dependencies
-pip install pyinstaller
+# Tray app (uses GTK/AppIndicator)
+python -m trayrunner.app
 
-# Download linuxdeploy tools (if not present)
-wget https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
-chmod +x linuxdeploy-x86_64.AppImage
+# Config GUI (PySide6)
+python -m trayrunner_gui.app
+```
 
-# Build the AppImage
+### 3️⃣ File Locations
+| Path | Description |
+|------|--------------|
+| `src/trayrunner/` | Tray app (system tray, config reload logic) |
+| `gui/trayrunner_gui/` | Config GUI (Qt/PySide6) |
+| `scripts/` | Build scripts and packaging helpers |
+| `build_appimage/` | Output directory for AppImage builds |
+| `~/.config/trayrunner/commands.yaml` | User config file |
+
+---
+
+## 🧱 Building the AppImage (Developers)
+
+TrayRunner uses **PyInstaller** + **linuxdeploy** to bundle both the tray app and the Config GUI into a single AppImage.
+
+### 🧰 Prerequisites (on Ubuntu 20.04+)
+```bash
+sudo apt update
+sudo apt install -y python3 python3-venv python3-pip rsync patchelf file wget fuse libfuse2
+```
+
+### ⚙️ Setup linuxdeploy + Qt Plugin
+```bash
+mkdir -p tools && cd tools
+wget -O linuxdeploy-x86_64.AppImage https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+wget -O linuxdeploy-plugin-qt-x86_64.AppImage https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+chmod +x linuxdeploy-*.AppImage
+cd ..
+```
+
+### 🏗️ Build Commands
+```bash
+# Clean
+rm -rf build_appimage dist
+
+# Freeze the GUI (PyInstaller)
+python -m pip install --upgrade pip pyinstaller
+pyinstaller gui/trayrunner_gui/app.py --name trayrunner-gui --onefile --noconfirm
+
+# Run full build script
 ./scripts/build_appimage.sh
 ```
 
-The build script will:
-- Freeze the GUI with PyInstaller
-- Bundle Qt libraries with linuxdeploy
-- Create `TrayRunner-x86_64.AppImage`
-- Generate SHA256 checksums
-
-## 🧪 Testing
-
-### Manual Testing
-
-1. **Core Application**:
-   ```bash
-   python3 src/trayrunner/app.py
-   ```
-   - Verify tray icon appears
-   - Test menu items work
-   - Check reload functionality
-
-2. **GUI Editor**:
-   ```bash
-   python3 -m gui.trayrunner_gui.app
-   ```
-   - Test load/save operations
-   - Verify validation works
-   - Test duplicate/delete functions
-   - Check auto-reload integration
-
-3. **AppImage Testing**:
-   ```bash
-   ./TrayRunner-x86_64.AppImage
-   ```
-   - Test on clean system
-   - Verify both core and GUI work
-   - Check tray menu integration
-
-### Test Systems
-
-- Ubuntu 20.04 LTS (baseline)
-- Ubuntu 22.04 LTS
-- Debian 12
-- Linux Mint 21
-
-## 📁 Project Structure
-
+The resulting AppImage will be in:
 ```
-trayrunner/
-├── src/trayrunner/           # Core tray application
-│   ├── app.py                # Main application logic
-│   └── icons/                  # Tray icons
-├── gui/trayrunner_gui/       # GUI editor
-│   ├── app.py                # GUI entry point
-│   ├── main_window.py         # Main window
-│   ├── tree_panel.py         # Tree view
-│   ├── editor_panel.py        # Property editor
-│   ├── models/                # Data models
-│   └── services/              # Services (logging, reload, etc.)
-├── scripts/                   # Build scripts
-│   └── build_appimage.sh      # AppImage builder
-├── config/                    # Default configuration
-└── requirements.txt           # Python dependencies
+build_appimage/out/TrayRunner-x86_64.AppImage
 ```
 
-## 🔧 Code Architecture
-
-### Core Application (`src/trayrunner/`)
-- **TrayRunner**: Main application class
-- **ConfigLoader**: YAML configuration handling
-- **CommandRunner**: Command execution and logging
-
-### GUI Editor (`gui/trayrunner_gui/`)
-- **MainWindow**: Main application window
-- **TreePanel**: Hierarchical tree view
-- **EditorPanel**: Property editing interface
-- **Models**: Pydantic schemas for validation
-- **Services**: Logging, file watching, reload coordination
-
-### Key Design Patterns
-- **MVC Architecture**: Clear separation of concerns
-- **Signal/Slot**: Qt-based event handling
-- **Observer Pattern**: File watching and validation
-- **Factory Pattern**: Node creation and cloning
-
-## 🐛 Debugging
-
-### Debug Logging
-
-The GUI includes comprehensive debug logging:
-
+### ✅ Test Run
 ```bash
-# View debug logs
-tail -f ~/.local/state/trayrunner/gui-debug.log
-
-# Or use the GUI
-Tools → Open GUI Debug Log
+chmod +x build_appimage/out/TrayRunner-x86_64.AppImage
+./build_appimage/out/TrayRunner-x86_64.AppImage
 ```
 
-### Common Issues
+---
 
-1. **Import Errors**: Ensure all dependencies are installed
-2. **GTK Issues**: Check AppIndicator installation
-3. **Qt Issues**: Verify PySide6 installation
-4. **File Permissions**: Check config directory permissions
+## 🧩 Common Build Issues
 
-## 📝 Pull Request Guidelines
+| Issue | Fix |
+|-------|-----|
+| **Tray icon not showing** | Install AppIndicator dependencies (`sudo apt install python3-gi gir1.2-gtk-3.0 libayatana-appindicator3-1 gir1.2-ayatanaappindicator3-0.1`) |
+| **GUI doesn't launch** | Ensure both executables (`trayrunner` + `trayrunner-gui`) are registered with linuxdeploy (`--executable`) |
+| **glibc mismatch** | Build on Ubuntu 20.04 for maximum compatibility |
+| **Wayland / GNOME 45+** | Enable the AppIndicator GNOME extension |
 
-### Before Submitting
+---
 
-- [ ] Test on multiple systems (Ubuntu, Debian, Mint)
-- [ ] Update documentation if needed
-- [ ] Add tests for new features
-- [ ] Ensure AppImage still builds
-- [ ] Check for linting errors
+## 🧱 Release Process
 
-### Commit Messages
+1. Bump version number in `__init__.py` or metadata.
+2. Run:
+```bash
+./scripts/build_appimage.sh
+```
+3. Test both AppImages (`x86_64`, `aarch64`) locally.
+4. Upload to GitHub Releases with `SHA256SUMS`.
+5. Verify tray → Settings → Open Config GUI works.
 
-Use clear, descriptive commit messages:
-- `feat: add duplicate functionality`
-- `fix: resolve context menu index issue`
-- `docs: simplify README for end users`
+---
 
-### Code Style
+## 🧪 Testing & Logging
 
-- Follow existing code patterns
-- Add type hints where appropriate
-- Include docstrings for new functions
-- Use meaningful variable names
+- Tray logs → `~/.local/state/trayrunner/run.log`
+- GUI logs → `~/.local/state/trayrunner/gui-debug.log`
+- Run GUI in debug mode:
+```bash
+python -m trayrunner_gui.app --debug
+```
 
-## 🚀 Release Process
+---
 
-### For Maintainers
+## 🧠 Code Style
 
-1. **Update Version**:
+- Follow **PEP 8**.
+- Use **absolute imports** (avoid `..` relative imports in GUI).
+- Keep GUI & core separated — no GUI dependencies in `src/trayrunner`.
+- Commit messages: present tense, short, imperative ("Fix drag/drop reorder").
+
+---
+
+## 🙌 How to Contribute
+
+1. Fork the repo & branch from `main`:
    ```bash
-   # Update pyproject.toml version
-   # Update CHANGELOG.md
+   git checkout -b feature/drag-drop-improvement
    ```
+2. Make your changes.
+3. Run and test both tray and GUI locally.
+4. Submit a **pull request** with a clear title and short description.
 
-2. **Build AppImage**:
-   ```bash
-   ./scripts/build_appimage.sh
-   ```
+---
 
-3. **Test Release**:
-   - Test on Ubuntu 20.04, 22.04, Debian 12
-   - Verify both core and GUI work
-   - Check tray integration
+## 🧰 Recommended Environment
 
-4. **Create Release**:
-   - Tag the release: `git tag v1.2.0`
-   - Push tag: `git push origin v1.2.0`
-   - Upload AppImage to GitHub releases
-   - Include SHA256 checksums
+| Component | Version |
+|------------|----------|
+| Ubuntu | 20.04 / 22.04 |
+| Python | ≥3.9 |
+| PySide6 | 6.5+ |
+| linuxdeploy | latest continuous |
+| AppIndicator libs | installed (system) |
 
-### Release Checklist
+---
 
-- [ ] Version updated in pyproject.toml
-- [ ] CHANGELOG.md updated
-- [ ] AppImage builds successfully
-- [ ] Tested on target systems
-- [ ] GitHub release created
-- [ ] SHA256SUMS included
+## 🏁 Summary
 
-## 🤝 Getting Help
-
-- **Issues**: Use GitHub Issues for bug reports
-- **Discussions**: Use GitHub Discussions for questions
-- **Code**: Submit Pull Requests for contributions
-
-## 📄 License
-
-By contributing to TrayRunner, you agree that your contributions will be licensed under the MIT License.
+- End users: just run the AppImage.  
+- Developers: build or tweak freely using the provided scripts.  
+- All builds use **linuxdeploy + PyInstaller** for consistency.  
+- Always test tray + GUI together before pushing changes.
