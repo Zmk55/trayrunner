@@ -35,6 +35,8 @@ TrayRunner/
 - ✅ **Smart Backup**: Automatic timestamped backups
 - ✅ **File Watching**: Detects external changes to your config
 - ✅ **Cross-Platform**: Works on Ubuntu, Debian, Mint, Raspberry Pi
+- ✅ **User-Friendly Documentation**: Simplified README with prominent download button
+- ✅ **Architecture Support**: x86_64 and aarch64 (Raspberry Pi) AppImages
 
 ## Distribution Strategy
 - **Primary**: AppImage for end users (recommended)
@@ -77,6 +79,7 @@ sudo ./install.sh
 - ✅ **GUI Testing**: Comprehensive drag-and-drop, validation, auto-reload
 - ✅ **Error Handling**: Robust error handling with user feedback
 - ✅ **Documentation**: Simplified user docs + detailed developer guide
+- ✅ **Troubleshooting**: Enhanced troubleshooting table with common fixes
 - ✅ **CI/CD**: Automated AppImage builds via GitHub Actions
 - ✅ **Version Control**: Proper versioning and changelog
 
@@ -90,6 +93,8 @@ sudo ./install.sh
 The project is optimized for end users with:
 - AppImage-first distribution approach
 - Simplified documentation for non-developers
+- Prominent download button and clear architecture guidance
+- Enhanced troubleshooting with common fixes
 - Comprehensive developer resources
 - Professional user experience
-- Cross-platform compatibility
+- Cross-platform compatibility (x86_64 and aarch64)
