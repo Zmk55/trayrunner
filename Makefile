@@ -22,7 +22,13 @@ appimage: tools
 
 test:
 	@echo "Running tests..."
-	python -m pytest tests/ -v
+	@if command -v pytest >/dev/null 2>&1; then \
+		python3 -m pytest tests/ -v; \
+	else \
+		echo "pytest not available, running tests directly..."; \
+		python3 tests/test_yaml_roundtrip.py; \
+		python3 tests/test_reload_socket.py; \
+	fi
 
 fmt:
 	@echo "Formatting code..."

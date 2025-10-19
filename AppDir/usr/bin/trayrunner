@@ -1,6 +1,0 @@
-#!/bin/bash
-#!/bin/bash
-# TrayRunner core wrapper - uses system Python with GTK
-HERE="$(dirname "$(readlink -f "${0}")")"
-cd "$HERE/../share/trayrunner"
-exec python3 trayrunner/app.py "$@"
