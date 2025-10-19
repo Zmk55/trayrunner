@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional
 from PySide6.QtWidgets import (
     QMainWindow, QSplitter, QWidget, QVBoxLayout, QHBoxLayout,
-    QMenuBar, QToolBar, QStatusBar, QMessageBox, QFileDialog,
+    QMenuBar, QStatusBar, QMessageBox, QFileDialog,
     QApplication, QDockWidget, QTableWidget, QTableWidgetItem,
     QHeaderView, QLabel, QPushButton
 )
@@ -113,7 +113,6 @@ class MainWindow(QMainWindow):
         # Setup UI
         self.setup_ui()
         self.setup_menus()
-        self.setup_toolbar()
         self.setup_statusbar()
         self.setup_connections()
         
@@ -253,19 +252,6 @@ class MainWindow(QMainWindow):
         self.about_action.triggered.connect(self.show_about)
         help_menu.addAction(self.about_action)
     
-    def setup_toolbar(self):
-        """Setup toolbar"""
-        toolbar = QToolBar("Main Toolbar")
-        self.addToolBar(toolbar)
-        
-        toolbar.addAction(self.new_action)
-        toolbar.addAction(self.open_action)
-        toolbar.addAction(self.save_action)
-        toolbar.addSeparator()
-        toolbar.addAction(self.add_item_action)
-        toolbar.addAction(self.add_group_action)
-        toolbar.addSeparator()
-        toolbar.addAction(self.reload_action)
     
     def setup_statusbar(self):
         """Setup status bar"""
