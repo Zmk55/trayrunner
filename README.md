@@ -77,11 +77,18 @@ EOF
 - **Edit**: Use the GUI (recommended) or edit manually
 - **Backup**: Automatic backups created on save
 
+**📖 [INSTALL.md](INSTALL.md)** - Traditional installation methods for advanced users
+
 ## 💻 For Developers
 
 Building from source requires Linux, Python 3.9+, Qt 6, PySide6.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, building, and contributing guidelines.
+**📖 [CONTRIBUTING.md](CONTRIBUTING.md)** - Complete developer guide including:
+- Development setup and requirements
+- Building AppImage with linuxdeploy + PyInstaller
+- Common build issues and solutions
+- Testing and debugging guidance
+- Code style and contribution workflow
 
 ## 📄 License
 
