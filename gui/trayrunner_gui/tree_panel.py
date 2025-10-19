@@ -4,6 +4,7 @@ Tree panel for displaying and editing configuration structure
 
 from typing import Optional, Any, Dict, List
 import json
+import uuid
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTreeView, QLineEdit,
     QPushButton, QMenu, QMessageBox, QInputDialog
