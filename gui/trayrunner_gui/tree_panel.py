@@ -12,7 +12,7 @@ from PySide6.QtCore import Qt, QAbstractItemModel, QModelIndex, Signal, QMimeDat
 from PySide6.QtGui import QAction, QIcon, QDragEnterEvent, QDropEvent
 
 try:
-    from ..models.schema import Config, Node, ItemNode, GroupNode, SeparatorNode
+    from trayrunner_gui.models.schema import Config, Node, ItemNode, GroupNode, SeparatorNode
 except ImportError:
     # Handle direct execution
     import sys
@@ -115,11 +115,20 @@ class ConfigTreeModel(QAbstractItemModel):
         return None
     
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
-        """Get item flags"""
-        if not index.isValid():
-            return Qt.NoItemFlags
+        """Get item flags for drag-and-drop"""
+        default_flags = super().flags(index)
         
-        flags = Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsDragEnabled | Qt.ItemIsDropEnabled
+        if not index.isValid():
+            # Allow drops on empty space (top level)
+            return default_flags | Qt.ItemIsDropEnabled
+        
+        node = self._node_from_index(index)
+        flags = default_flags | Qt.ItemIsDragEnabled
+        
+        # Groups accept drops INTO them; items/separators only accept drops BETWEEN
+        if isinstance(node, GroupNode):
+            flags |= Qt.ItemIsDropEnabled
+        
         return flags
     
     def supportedDropActions(self) -> Qt.DropActions:
@@ -145,15 +154,14 @@ class ConfigTreeModel(QAbstractItemModel):
         parent_id = self._get_parent_id(index)
         row = index.row()
         
-        # Get drag range (block for separators)
-        start, end = self._get_drag_range(parent_id, row)
+        # Calculate drag range (for separator blocks)
+        start, end = self._drag_range_for(parent_id, row)
         
         # Create payload
         payload = {
-            "parent_id": parent_id,
-            "start_row": start,
-            "end_row": end,
-            "dragged_node_id": node.id
+            "src_parent": parent_id,
+            "start": start,
+            "end": end
         }
         
         mime_data = QMimeData()
@@ -193,18 +201,12 @@ class ConfigTreeModel(QAbstractItemModel):
         payload_bytes = bytes(data.data(self.MIME_TYPE))
         payload = json.loads(payload_bytes.decode("utf-8"))
         
-        src_parent_id = payload["parent_id"]
-        src_start = payload["start_row"]
-        src_end = payload["end_row"]
+        src_parent_id = payload["src_parent"]
+        src_start = payload["start"]
+        src_end = payload["end"]
         
-        # Get destination parent
-        if parent.isValid():
-            dst_parent_node = parent.internalPointer()
-            if isinstance(dst_parent_node, SeparatorNode):
-                return False  # Cannot drop into separator
-            dst_parent_id = dst_parent_node.id
-        else:
-            dst_parent_id = "ROOT"
+        # Get destination parent ID
+        dst_parent_id = self._get_parent_id(parent)
         
         # Get source and destination lists
         src_list = self._get_children_list(src_parent_id)
@@ -217,18 +219,15 @@ class ConfigTreeModel(QAbstractItemModel):
         # Extract block to move
         block = src_list[src_start:src_end]
         
-        # Prevent dropping into self
+        # Prevent dropping into itself (for groups)
         for node in block:
-            if dst_parent_id == node.id:
-                return False
-        
-        # Signal layout change
-        self.layoutAboutToBeChanged.emit()
+            if isinstance(node, GroupNode) and dst_parent_id == node.id:
+                return False  # Cannot drop group into itself
         
         # Remove from source
         del src_list[src_start:src_end]
         
-        # Adjust row if moving within same parent
+        # Adjust destination row if moving within same parent
         if src_parent_id == dst_parent_id and row > src_start:
             row -= (src_end - src_start)
         
@@ -236,13 +235,77 @@ class ConfigTreeModel(QAbstractItemModel):
         for i, node in enumerate(block):
             dst_list.insert(row + i, node)
         
-        # Signal change complete
-        self.layoutChanged.emit()
+        # Rebuild affected parents in the tree view
+        self._rebuild_parent_subtree(src_parent_id)
+        if dst_parent_id != src_parent_id:
+            self._rebuild_parent_subtree(dst_parent_id)
         
-        # Emit custom signal for save/validation
+        # Emit signals
+        self.layoutChanged.emit()
         self.changed.emit()
         
+        # Reselect the first moved node
+        self._select_node_at(dst_parent_id, row)
+        
         return True
+    
+    def _get_parent_id(self, index):
+        """Get parent ID from index (ROOT for top level)"""
+        if not index.isValid():
+            return "ROOT"
+        node = self._node_from_index(index)
+        return node.id if node else "ROOT"
+    
+    def _get_children_list(self, parent_id):
+        """Get mutable list of children for a parent"""
+        if parent_id == "ROOT":
+            return self.root_items
+        
+        # Find parent node recursively
+        parent_node = self._find_node_by_id(parent_id, self.root_items)
+        if parent_node and isinstance(parent_node, GroupNode):
+            return parent_node.items
+        
+        return []
+    
+    def _find_node_by_id(self, node_id, items):
+        """Recursively find node by ID"""
+        for item in items:
+            if item.id == node_id:
+                return item
+            if isinstance(item, GroupNode):
+                found = self._find_node_by_id(node_id, item.items)
+                if found:
+                    return found
+        return None
+    
+    def _rebuild_parent_subtree(self, parent_id):
+        """Rebuild tree view for a parent's children"""
+        if parent_id == "ROOT":
+            # Rebuild entire tree
+            self.beginResetModel()
+            self.endResetModel()
+        else:
+            # Find and rebuild specific parent
+            parent_node = self._find_node_by_id(parent_id, self.root_items)
+            if parent_node:
+                # For now, simple approach: reset entire model
+                self.beginResetModel()
+                self.endResetModel()
+    
+    def _select_node_at(self, parent_id, row):
+        """Select node at specific position after move"""
+        # Find the QModelIndex for the node
+        if parent_id == "ROOT":
+            if row < len(self.root_items):
+                index = self.index(row, 0, QModelIndex())
+                # Note: We can't access tree_view from here, so this is a placeholder
+                # The actual selection will be handled by the tree panel
+                pass
+        else:
+            # Need to find parent index first, then select child
+            # For simplicity, we'll just clear selection for now
+            pass
     
     def add_item(self, parent_index: QModelIndex = QModelIndex()) -> bool:
         """Add new item"""
@@ -344,7 +407,7 @@ class ConfigTreeModel(QAbstractItemModel):
                     return found
         return None
     
-    def _get_drag_range(self, parent_id: str, row: int) -> tuple[int, int]:
+    def _drag_range_for(self, parent_id: str, row: int) -> tuple[int, int]:
         """
         Get the range [start, end) for dragging a node.
         If the node is a separator, returns the block range.
@@ -518,18 +581,48 @@ class TreePanel(QWidget):
             pass
     
     def delete_selected(self):
-        """Delete selected item"""
-        current = self.tree_view.currentIndex()
-        if current.isValid() and self.model:
-            reply = QMessageBox.question(
-                self, "Delete Item",
-                "Are you sure you want to delete this item?",
-                QMessageBox.Yes | QMessageBox.No
-            )
-            
-            if reply == QMessageBox.Yes:
-                self.model.remove_item(current)
-                self.data_changed.emit()
+        """Delete selected node (handles separators correctly)"""
+        index = self.tree_view.currentIndex()
+        if not index.isValid():
+            return
+        
+        node = self.model._node_from_index(index)
+        if not node:
+            return
+        
+        # Confirm deletion
+        node_desc = "Separator" if isinstance(node, SeparatorNode) else f"{node.label}"
+        reply = QMessageBox.question(
+            self,
+            "Delete Item",
+            f"Delete {node_desc}?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        
+        if reply != QMessageBox.Yes:
+            return
+        
+        # Get parent and row
+        parent_index = index.parent()
+        parent_id = self.model._get_parent_id(parent_index)
+        row = index.row()
+        
+        # Remove from data model
+        children = self.model._get_children_list(parent_id)
+        if row < len(children):
+            del children[row]
+        
+        # Rebuild tree view
+        self.model._rebuild_parent_subtree(parent_id)
+        
+        # Emit change signal
+        self.model.changed.emit()
+        
+        # Select neighbor node
+        if children:
+            new_row = min(row, len(children) - 1)
+            self.model._select_node_at(parent_id, new_row)
     
     def keyPressEvent(self, event):
         """Handle keyboard events"""

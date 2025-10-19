@@ -12,7 +12,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont
 
 try:
-    from ..models.schema import ItemNode, GroupNode, SeparatorNode
+    from trayrunner_gui.models.schema import ItemNode, GroupNode, SeparatorNode
 except ImportError:
     # Handle direct execution
     import sys

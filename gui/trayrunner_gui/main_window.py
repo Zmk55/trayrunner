@@ -17,11 +17,11 @@ from PySide6.QtGui import QAction, QKeySequence, QIcon
 try:
     from .tree_panel import TreePanel
     from .editor_panel import EditorPanel
-    from ..models.schema import Config, ValidationError
-    from ..models.yaml_io import yaml_handler
-    from ..models.validators import config_validator
-    from ..services.reloader import reload_manager
-    from ..services.file_watch import ConfigFileWatcher
+    from trayrunner_gui.models.schema import Config, ValidationError
+    from trayrunner_gui.models.yaml_io import yaml_handler
+    from trayrunner_gui.models.validators import config_validator
+    from trayrunner_gui.services.reloader import reload_manager
+    from trayrunner_gui.services.file_watch import ConfigFileWatcher
 except ImportError:
     # Handle direct execution
     import sys
@@ -317,6 +317,10 @@ class MainWindow(QMainWindow):
             return
         
         try:
+            # Pause file watcher before save
+            if self.file_watcher:
+                self.file_watcher.pause()
+            
             backup_path = yaml_handler.save_yaml(
                 self.config_path, 
                 self.config, 
@@ -334,8 +338,8 @@ class MainWindow(QMainWindow):
             self.status_bar.showMessage(f"Saved. Backup created: {backup_path.name}", 3000)
             
             # Auto-reload if enabled in preferences
-            from ..models.preferences import load_prefs
-            from ..services.reloader import try_reload
+            from trayrunner_gui.models.preferences import load_prefs
+            from trayrunner_gui.services.reloader import try_reload
             
             prefs = load_prefs()
             if prefs.get("reload_after_save", True):
@@ -346,8 +350,15 @@ class MainWindow(QMainWindow):
                 else:
                     # Show warning but don't block - reload is optional
                     self.status_bar.showMessage(f"Saved (reload warning: {msg})", 6000)
+            
+            # Resume file watcher after a short delay (debounce)
+            if self.file_watcher:
+                QTimer.singleShot(200, self.file_watcher.resume)
         
         except Exception as e:
+            # Make sure to resume watcher even on error
+            if self.file_watcher:
+                self.file_watcher.resume()
             QMessageBox.critical(self, "Save Error", f"Failed to save configuration: {e}")
     
     def save_as_config(self):
@@ -466,7 +477,7 @@ class MainWindow(QMainWindow):
     def show_preferences(self):
         """Show preferences dialog"""
         from PySide6.QtWidgets import QDialog, QVBoxLayout, QCheckBox, QDialogButtonBox
-        from ..models.preferences import load_prefs, save_prefs
+        from trayrunner_gui.models.preferences import load_prefs, save_prefs
         
         # Create dialog
         dialog = QDialog(self)

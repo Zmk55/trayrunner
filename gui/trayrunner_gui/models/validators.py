@@ -43,6 +43,9 @@ class ConfigValidator:
         # Check for duplicate labels at same level
         self._check_duplicate_labels(config.items, "root")
         
+        # Check separator placement
+        self._validate_separator_placement(config.items, "items")
+        
         return self.errors + self.warnings
     
     def _validate_node(self, node: Node, path: str) -> None:
@@ -149,6 +152,39 @@ class ConfigValidator:
                         field="label"
                     ))
                 labels.add(item.label)
+    
+    def _validate_separator_placement(self, items: List[Node], path: str) -> None:
+        """Validate separator placement and warn about edge cases"""
+        for i, node in enumerate(items):
+            if isinstance(node, SeparatorNode):
+                # Warn if separator at edge
+                if i == 0:
+                    self.warnings.append(ValidationError(
+                        type="warning",
+                        location=f"{path}[{i}]",
+                        message="Separator at beginning has no visual effect",
+                        field="type"
+                    ))
+                if i == len(items) - 1:
+                    self.warnings.append(ValidationError(
+                        type="warning",
+                        location=f"{path}[{i}]",
+                        message="Separator at end has no visual effect",
+                        field="type"
+                    ))
+                
+                # Warn if adjacent separators
+                if i + 1 < len(items) and isinstance(items[i + 1], SeparatorNode):
+                    self.warnings.append(ValidationError(
+                        type="warning",
+                        location=f"{path}[{i}]",
+                        message="Back-to-back separators have no visual effect",
+                        field="type"
+                    ))
+            
+            elif isinstance(node, GroupNode):
+                # Recursively validate group's children
+                self._validate_separator_placement(node.items, f"{path}[{i}].items")
     
     def validate_item_command(self, cmd: str) -> List[str]:
         """

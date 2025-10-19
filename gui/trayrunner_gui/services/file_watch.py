@@ -143,6 +143,7 @@ class ConfigFileWatcher:
         self.config_path = config_path
         self.watcher: Optional[FileWatcher] = None
         self.change_callback: Optional[Callable[[str], None]] = None
+        self._paused = 0  # Reference counter for nested pauses
     
     def start_watching(self, callback: Callable[[str], None]):
         """
@@ -166,8 +167,19 @@ class ConfigFileWatcher:
             self.watcher.cleanup()
             self.watcher = None
     
+    def pause(self):
+        """Pause file watching (reference counted)"""
+        self._paused += 1
+    
+    def resume(self):
+        """Resume file watching (reference counted)"""
+        self._paused = max(0, self._paused - 1)
+    
     def _on_file_changed(self, file_path: str):
         """Handle file change event"""
+        if self._paused:
+            return  # Ignore events while paused
+        
         if self.change_callback:
             self.change_callback(file_path)
     
