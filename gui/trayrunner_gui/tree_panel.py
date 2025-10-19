@@ -46,12 +46,12 @@ class ConfigTreeModel(QAbstractItemModel):
         
         if not parent.isValid():
             # Root level
-            if row < len(self.root_items):
+            if self.root_items and row < len(self.root_items):
                 return self.createIndex(row, column, self.root_items[row])
         else:
             # Child level
             parent_node = parent.internalPointer()
-            if isinstance(parent_node, GroupNode) and row < len(parent_node.items):
+            if parent_node and isinstance(parent_node, GroupNode) and parent_node.items and row < len(parent_node.items):
                 return self.createIndex(row, column, parent_node.items[row])
         
         return QModelIndex()
@@ -77,11 +77,14 @@ class ConfigTreeModel(QAbstractItemModel):
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         """Get number of rows under parent"""
         if not parent.isValid():
-            return len(self.root_items)
+            return len(self.root_items) if self.root_items else 0
         
         node = parent.internalPointer()
+        if not node:
+            return 0
+        
         if isinstance(node, GroupNode):
-            return len(node.items)
+            return len(node.items) if node.items else 0
         
         return 0
     
@@ -89,12 +92,20 @@ class ConfigTreeModel(QAbstractItemModel):
         """Get number of columns"""
         return 1
     
+    def _node_from_index(self, index: QModelIndex):
+        """Get node from index"""
+        if not index.isValid():
+            return None
+        return index.internalPointer()
+    
     def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> Any:
         """Get data for index"""
         if not index.isValid():
             return None
         
         node = index.internalPointer()
+        if not node:
+            return None
         
         if role == Qt.DisplayRole:
             if isinstance(node, ItemNode):
