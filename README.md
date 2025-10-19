@@ -6,6 +6,8 @@ A system tray application for Linux with customizable command menus and a visual
 [![Python 3](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![Linux](https://img.shields.io/badge/platform-Linux-lightgrey.svg)](https://www.linux.org/)
 
+[![Download Latest AppImage](https://img.shields.io/badge/Download-Latest%20AppImage-green.svg)](https://github.com/Zmk55/trayrunner/releases)
+
 ## 🚀 Quick Start
 
 ### Download
@@ -22,10 +24,14 @@ Right-click the tray icon → **Settings → Open Config GUI**
 
 ## ✅ Tested Systems
 
-- Ubuntu 20.04 / 22.04 / 24.04
-- Linux Mint 20-22
-- Debian 12
-- Raspberry Pi OS (Desktop)
+- Ubuntu 20.04 / 22.04 / 24.04 (x86_64)
+- Linux Mint 20-22 (x86_64)
+- Debian 12 (x86_64)
+- Raspberry Pi OS (Desktop) (aarch64)
+
+**Architecture Support:**
+- **x86_64**: Most desktop and laptop computers
+- **aarch64**: Raspberry Pi 4/5, ARM-based systems
 
 **Optional**: If tray icon doesn't appear:
 ```bash
@@ -47,6 +53,7 @@ sudo apt install libayatana-appindicator3-1
 |-------|-----|
 | **No tray icon** | `sudo apt install libayatana-appindicator3-1` |
 | **AppImage won't run** | `chmod +x TrayRunner-*.AppImage` |
+| **Permission denied** | `chmod +x TrayRunner-*.AppImage` |
 | **Config didn't update** | Click Save in GUI |
 | **GUI won't open** | Update to latest AppImage |
 
@@ -71,6 +78,8 @@ EOF
 - **Backup**: Automatic backups created on save
 
 ## 💻 For Developers
+
+Building from source requires Linux, Python 3.9+, Qt 6, PySide6.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, building, and contributing guidelines.
 
