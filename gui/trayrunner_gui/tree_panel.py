@@ -519,6 +519,8 @@ class TreePanel(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.model: Optional[ConfigTreeModel] = None
+        # Add context index storage
+        self._context_index = QModelIndex()
         self.setup_ui()
         self.setup_connections()
     
@@ -589,6 +591,10 @@ class TreePanel(QWidget):
     def show_context_menu(self, position):
         """Show context menu"""
         index = self.tree_view.indexAt(position)
+        
+        # Store the context index for actions to use
+        self._context_index = index
+        
         menu = QMenu(self)
         
         # Add actions
@@ -608,7 +614,8 @@ class TreePanel(QWidget):
             menu.addSeparator()
             
             duplicate_action = QAction("Duplicate", self)
-            duplicate_action.triggered.connect(self.duplicate_selected)
+            # Use stored index instead of lambda capture
+            duplicate_action.triggered.connect(self._on_duplicate_triggered)
             menu.addAction(duplicate_action)
             
             delete_action = QAction("Delete", self)
@@ -692,9 +699,10 @@ class TreePanel(QWidget):
             new_row = min(row, len(children) - 1)
             self.model._select_node_at(parent_id, new_row)
     
-    def duplicate_selected(self):
-        """Duplicate the currently selected node"""
-        index = self.tree_view.currentIndex()
+    def _on_duplicate_triggered(self):
+        """Handle duplicate action from context menu"""
+        # Use the stored context index instead of currentIndex()
+        index = self._context_index
         
         if not index.isValid():
             return
@@ -747,6 +755,18 @@ class TreePanel(QWidget):
         # Try to show status message if we have access to status bar
         if hasattr(self, 'statusBar') and callable(getattr(self, 'statusBar')):
             self.statusBar().showMessage(status_msg, 2000)
+    
+    def duplicate_selected(self):
+        """Duplicate the currently selected node (called by keyboard shortcut)"""
+        # Use currentIndex() for keyboard shortcut
+        index = self.tree_view.currentIndex()
+        
+        if not index.isValid():
+            return
+        
+        # Store it temporarily so _on_duplicate_triggered can use it
+        self._context_index = index
+        self._on_duplicate_triggered()
     
     def keyPressEvent(self, event):
         """Handle keyboard events"""
