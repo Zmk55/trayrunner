@@ -23,6 +23,7 @@ try:
     from trayrunner_gui.services.reloader import reload_manager
     from trayrunner_gui.services.file_watch import ConfigFileWatcher
     from trayrunner_gui.services.save_coordinator import save_coordinator
+    from trayrunner_gui.services.gui_logger import get_log_path
 except ImportError:
     # Handle direct execution
     import sys
@@ -231,6 +232,12 @@ class MainWindow(QMainWindow):
         self.preferences_action = QAction("&Preferences", self)
         self.preferences_action.triggered.connect(self.show_preferences)
         tools_menu.addAction(self.preferences_action)
+        
+        tools_menu.addSeparator()
+        
+        self.debug_log_action = QAction("Open GUI Debug &Log", self)
+        self.debug_log_action.triggered.connect(self.open_debug_log)
+        tools_menu.addAction(self.debug_log_action)
         
         # Help menu
         help_menu = menubar.addMenu("&Help")
@@ -547,6 +554,15 @@ Environment:
 Built with PySide6, ruamel.yaml, and pydantic."""
         
         QMessageBox.about(self, "About TrayRunner", info)
+    
+    def open_debug_log(self):
+        """Open the GUI debug log file"""
+        import subprocess
+        log_path = get_log_path()
+        try:
+            subprocess.Popen(["xdg-open", log_path])
+        except Exception as e:
+            QMessageBox.warning(self, "Cannot Open Log", f"Failed to open log file:\n{log_path}\n\nError: {e}")
     
     def on_selection_changed(self, node_data):
         """Handle selection change in tree"""

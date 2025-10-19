@@ -14,6 +14,7 @@ from PySide6.QtGui import QAction, QIcon, QDragEnterEvent, QDropEvent
 try:
     from trayrunner_gui.models.schema import Config, Node, ItemNode, GroupNode, SeparatorNode
     from trayrunner_gui.models.utils import clone_node
+    from trayrunner_gui.services.gui_logger import get_logger
 except ImportError:
     # Handle direct execution
     import sys
@@ -21,6 +22,9 @@ except ImportError:
     sys.path.insert(0, str(Path(__file__).parent.parent))
     from trayrunner_gui.models.schema import Config, Node, ItemNode, GroupNode, SeparatorNode
     from trayrunner_gui.models.utils import clone_node
+    from trayrunner_gui.services.gui_logger import get_logger
+
+import traceback
 
 
 class ConfigTreeModel(QAbstractItemModel):
@@ -33,6 +37,8 @@ class ConfigTreeModel(QAbstractItemModel):
         super().__init__(parent)
         self.config = config
         self.root_items = config.items if config else []
+        # Initialize logger
+        self.model_log = get_logger("tree_model")
     
     def set_config(self, config: Config):
         """Update the model with new config"""
@@ -468,9 +474,15 @@ class ConfigTreeModel(QAbstractItemModel):
             Mutable list of children
         """
         if parent_node is self.root or parent_node == "ROOT":
+            count = len(self.root_items)
+            self.model_log.debug(f"children_of(ROOT) -> {count} items")
             return self.root_items
         elif isinstance(parent_node, GroupNode):
+            count = len(parent_node.items)
+            label = getattr(parent_node, 'label', '<no label>')
+            self.model_log.debug(f"children_of(Group: {label}) -> {count} items")
             return parent_node.items
+        self.model_log.warning(f"children_of() called with unexpected type: {type(parent_node)}")
         return []
     
     def unique_label(self, desired: str, parent_node=None) -> str:
@@ -502,11 +514,13 @@ class ConfigTreeModel(QAbstractItemModel):
     
     def rebuild_parent_subtree(self, parent_id: str):
         """Rebuild the subtree for a given parent"""
+        self.model_log.debug(f"rebuild_parent_subtree(parent_id={parent_id})")
         # For simplicity, reset the entire model
         # This can be optimized to only rebuild specific parent
         self.beginResetModel()
         # root_items already updated in place
         self.endResetModel()
+        self.model_log.debug("Model reset complete")
 
 
 class TreePanel(QWidget):
@@ -521,6 +535,8 @@ class TreePanel(QWidget):
         self.model: Optional[ConfigTreeModel] = None
         # Add context index storage
         self._context_index = QModelIndex()
+        # Initialize logger
+        self.log = get_logger("tree_panel")
         self.setup_ui()
         self.setup_connections()
     
@@ -592,8 +608,14 @@ class TreePanel(QWidget):
         """Show context menu"""
         index = self.tree_view.indexAt(position)
         
+        self.log.debug(f"Context menu at pos={position}, index.isValid={index.isValid()}, "
+                      f"row={index.row() if index.isValid() else None}, "
+                      f"col={index.column() if index.isValid() else None}")
+        
         # Store the context index for actions to use
         self._context_index = index
+        
+        self.log.debug(f"Stored context index: {self._context_index.isValid()}")
         
         menu = QMenu(self)
         
@@ -701,60 +723,104 @@ class TreePanel(QWidget):
     
     def _on_duplicate_triggered(self):
         """Handle duplicate action from context menu"""
-        # Use the stored context index instead of currentIndex()
-        index = self._context_index
+        self.log.debug("=== _on_duplicate_triggered CALLED ===")
         
-        if not index.isValid():
-            return
-        
-        # Get parent and current row
-        parent_index = index.parent()
-        current_row = index.row()
-        
-        # Get parent node (root or GroupNode)
-        if parent_index.isValid():
-            parent_node = self.model._node_from_index(parent_index)
-            parent_id = parent_node.id if parent_node else "ROOT"
-        else:
-            parent_node = self.model.root
-            parent_id = "ROOT"
-        
-        # Get the node to duplicate
-        source_node = self.model._node_from_index(index)
-        if not source_node:
-            return
-        
-        # Clone the node with new IDs and adjusted label
-        new_node = clone_node(
-            source_node,
-            self.model.generate_id,
-            lambda label: self.model.unique_label(label, parent_node)
-        )
-        
-        # Insert into backing list (right after current)
-        children = self.model.children_of(parent_node)
-        children.insert(current_row + 1, new_node)
-        
-        # Update Qt model
-        self.model.rebuild_parent_subtree(parent_id)
-        
-        # Select the new node
-        new_index = self.model.index(current_row + 1, 0, parent_index)
-        self.tree_view.setCurrentIndex(new_index)
-        self.tree_view.scrollTo(new_index)
-        
-        # Emit change signal for validation and unsaved changes
-        self.model.changed.emit()
-        
-        # Show status message
-        node_type = type(source_node).__name__.replace("Node", "")
-        status_msg = f"Duplicated {node_type}"
-        if hasattr(new_node, "label") and new_node.label:
-            status_msg += f": {new_node.label}"
-        
-        # Try to show status message if we have access to status bar
-        if hasattr(self, 'statusBar') and callable(getattr(self, 'statusBar')):
-            self.statusBar().showMessage(status_msg, 2000)
+        try:
+            # Use the stored context index instead of currentIndex()
+            index = self._context_index
+            
+            self.log.debug(f"Context index isValid={index.isValid()}, row={index.row() if index.isValid() else None}")
+            
+            if not index.isValid():
+                self.log.warning("Duplicate aborted: invalid context index")
+                return
+            
+            # Get parent and current row
+            parent_index = index.parent()
+            current_row = index.row()
+            
+            self.log.debug(f"Parent index isValid={parent_index.isValid()}, current_row={current_row}")
+            
+            # Get parent node (root or GroupNode)
+            if parent_index.isValid():
+                parent_node = self.model._node_from_index(parent_index)
+                parent_id = parent_node.id if parent_node else "ROOT"
+                parent_type = type(parent_node).__name__ if parent_node else "None"
+            else:
+                parent_node = self.model.root
+                parent_id = "ROOT"
+                parent_type = "Root"
+            
+            self.log.debug(f"Parent: type={parent_type}, id={parent_id}")
+            
+            # Get the node to duplicate
+            source_node = self.model._node_from_index(index)
+            if not source_node:
+                self.log.error("Duplicate aborted: source_node is None")
+                return
+            
+            source_type = type(source_node).__name__
+            source_label = getattr(source_node, 'label', '<no label>')
+            self.log.debug(f"Source node: type={source_type}, label={source_label}")
+            
+            # Get children list before
+            children = self.model.children_of(parent_node)
+            before_count = len(children)
+            self.log.debug(f"Children before insert: {before_count}")
+            
+            # Clone the node with new IDs and adjusted label
+            self.log.debug("Cloning node...")
+            new_node = clone_node(
+                source_node,
+                self.model.generate_id,
+                lambda label: self.model.unique_label(label, parent_node)
+            )
+            self.log.debug(f"Cloned node: type={type(new_node).__name__}, label={getattr(new_node, 'label', '<no label>')}")
+            
+            # Insert into backing list (right after current)
+            insert_row = current_row + 1
+            self.log.debug(f"Inserting at row {insert_row}")
+            children.insert(insert_row, new_node)
+            
+            after_count = len(children)
+            self.log.debug(f"Children after insert: {after_count}")
+            
+            # Update Qt model
+            self.log.debug("Calling rebuild_parent_subtree...")
+            self.model.rebuild_parent_subtree(parent_id)
+            self.log.debug("Rebuild complete")
+            
+            # Select the new node
+            new_index = self.model.index(insert_row, 0, parent_index)
+            self.log.debug(f"New index isValid={new_index.isValid()}, row={new_index.row() if new_index.isValid() else None}")
+            self.tree_view.setCurrentIndex(new_index)
+            self.tree_view.scrollTo(new_index)
+            
+            # Emit change signal for validation and unsaved changes
+            self.model.changed.emit()
+            self.log.debug("Changed signal emitted")
+            
+            # Show status message
+            node_type = type(source_node).__name__.replace("Node", "")
+            status_msg = f"Duplicated {node_type}"
+            if hasattr(new_node, "label") and new_node.label:
+                status_msg += f": {new_node.label}"
+            
+            self.log.info(f"Duplicate SUCCESS: {status_msg}")
+            
+            # Try to show status message if we have access to status bar
+            if hasattr(self, 'statusBar') and callable(getattr(self, 'statusBar')):
+                self.statusBar().showMessage(status_msg, 2000)
+                
+        except Exception as e:
+            tb = traceback.format_exc()
+            self.log.error(f"Duplicate FAILED with exception: {e}\n{tb}")
+            # Show non-blocking error message
+            try:
+                from PySide6.QtWidgets import QMessageBox
+                QMessageBox.warning(None, "Duplicate Error", f"Failed to duplicate: {e}\n\nSee debug log for details.")
+            except:
+                pass
     
     def duplicate_selected(self):
         """Duplicate the currently selected node (called by keyboard shortcut)"""
