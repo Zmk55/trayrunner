@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 from typing import Optional, Callable
 from PySide6.QtCore import QObject, Signal, QTimer
+from trayrunner_gui.services.save_coordinator import save_coordinator
 
 try:
     from watchdog.observers import Observer
@@ -179,6 +180,10 @@ class ConfigFileWatcher:
         """Handle file change event"""
         if self._paused:
             return  # Ignore events while paused
+        
+        # Check if this is our own save
+        if save_coordinator.should_ignore_change(Path(file_path)):
+            return
         
         if self.change_callback:
             self.change_callback(file_path)

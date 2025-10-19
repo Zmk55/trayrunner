@@ -1,88 +1,123 @@
 """
-Service for reloading TrayRunner configuration
+Reload coordinator - communicates with tray app to trigger config reload
 """
 
+from PySide6.QtNetwork import QLocalSocket
+from PySide6.QtCore import QStandardPaths
+import os
 import shutil
 import subprocess
-import sys
+import json
+import time
 from typing import Tuple
 
 
-def try_reload(retries: int = 3, delay_s: float = 0.2) -> Tuple[bool, str]:
-    """
-    Attempt to reload TrayRunner configuration with retries
+def _sock_path() -> str:
+    """Get path to reload socket"""
+    base = os.path.join(
+        QStandardPaths.writableLocation(QStandardPaths.AppDataLocation) or
+        os.path.expanduser("~/.local/state/trayrunner")
+    )
+    return os.path.join(base, "reload.sock")
+
+
+def _reload_via_socket(timeout_ms: int = 500) -> Tuple[bool, str]:
+    """Try to reload via socket IPC"""
+    sock_path = _sock_path()
     
-    Args:
-        retries: Number of retry attempts
-        delay_s: Delay between retries in seconds
+    # Check if socket exists
+    if not os.path.exists(sock_path):
+        return (False, "socket not found")
+    
+    socket = QLocalSocket()
+    socket.connectToServer(sock_path)
+    
+    if not socket.waitForConnected(timeout_ms):
+        return (False, f"connect timeout: {socket.errorString()}")
+    
+    # Send reload command
+    socket.write(b"RELOAD")
+    socket.flush()
+    
+    if not socket.waitForReadyRead(timeout_ms):
+        socket.disconnectFromServer()
+        return (False, "no response from tray")
+    
+    try:
+        response_data = bytes(socket.readAll()).decode("utf-8")
+        response = json.loads(response_data)
+        socket.disconnectFromServer()
         
-    Returns:
-        Tuple of (success, message)
-    """
-    import os
-    import time
-    
-    # Find trayrunner executable
-    # 1) Check if running in AppImage context
-    appdir = os.environ.get("APPDIR")
-    if appdir:
-        # When GUI is in AppImage, trayrunner might be on system PATH
-        # or launched from a different AppImage instance
-        exe = shutil.which("trayrunner")
-    else:
-        # Standard PATH lookup (pipx/dev)
-        exe = shutil.which("trayrunner")
-    
+        if response.get("ok"):
+            return (True, "reloaded via socket")
+        else:
+            return (False, "tray reload failed")
+    except Exception as e:
+        socket.disconnectFromServer()
+        return (False, f"bad response: {e}")
+
+
+def _which_trayrunner() -> str | None:
+    """Find trayrunner executable on PATH"""
+    return shutil.which("trayrunner")
+
+
+def _reload_via_cli() -> Tuple[bool, str]:
+    """Fallback: reload via CLI command"""
+    exe = _which_trayrunner()
     if not exe:
-        return (False, "trayrunner not found on PATH. If using AppImage, ensure TrayRunner is running.")
+        return (False, "trayrunner not found on PATH")
     
-    last_msg = ""
-    for attempt in range(retries):
-        try:
-            # Call trayrunner --reload
-            result = subprocess.run(
-                [exe, "--reload"],
-                capture_output=True,
-                text=True,
-                timeout=10  # 10 second timeout
-            )
-            
-            last_msg = result.stdout.strip() or result.stderr.strip()
-            
-            if result.returncode == 0:
-                return (True, last_msg or "Reload OK")
-            
-            # Wait before retry
-            if attempt < retries - 1:
-                time.sleep(delay_s)
-                
-        except subprocess.TimeoutExpired:
-            last_msg = "Reload command timed out"
-        except FileNotFoundError:
-            return (False, "trayrunner executable not found")
-        except Exception as e:
-            last_msg = f"Failed to execute reload: {e}"
+    try:
+        proc = subprocess.run(
+            [exe, "--reload"],
+            capture_output=True,
+            text=True,
+            timeout=2
+        )
+        msg = (proc.stdout or proc.stderr).strip() or "reloaded via CLI"
+        return (proc.returncode == 0, msg)
+    except subprocess.TimeoutExpired:
+        return (False, "CLI reload timeout")
+    except Exception as e:
+        return (False, f"CLI reload error: {e}")
+
+
+def reload_trayrunner() -> Tuple[bool, str]:
+    """
+    Request tray app to reload configuration.
     
-    return (False, last_msg or "Reload failed after retries")
+    Tries socket IPC first, falls back to CLI if unavailable.
+    
+    Returns:
+        Tuple of (success: bool, message: str)
+    """
+    # Try socket first (fast, works in AppImage)
+    ok, msg = _reload_via_socket()
+    if ok:
+        return (True, msg)
+    
+    # Socket failed - try CLI fallback
+    ok_cli, msg_cli = _reload_via_cli()
+    if ok_cli:
+        return (True, msg_cli)
+    
+    # Both failed
+    return (False, f"socket: {msg}; CLI: {msg_cli}")
+
+
+# Backwards compatibility alias
+try_reload = reload_trayrunner
 
 
 def is_trayrunner_running() -> bool:
     """
-    Check if TrayRunner is currently running
+    Check if TrayRunner is currently running by checking for socket
     
     Returns:
-        True if running, False otherwise
+        True if socket exists, False otherwise
     """
-    try:
-        # Check if trayrunner process is running
-        result = subprocess.run(
-            ["pgrep", "-f", "python.*trayrunner"],
-            capture_output=True,
-            text=True
-        )
-        return result.returncode == 0 and result.stdout.strip()
-    except Exception:
-        return False
+    return os.path.exists(_sock_path())
 
 
 def get_trayrunner_status() -> Tuple[bool, str]:
@@ -92,27 +127,10 @@ def get_trayrunner_status() -> Tuple[bool, str]:
     Returns:
         Tuple of (is_running, status_message)
     """
-    if not shutil.which("trayrunner"):
-        return (False, "trayrunner command not found in PATH")
-    
-    try:
-        # Try to get status using trayrunner status command
-        result = subprocess.run(
-            ["trayrunner", "status"],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
-        
-        if result.returncode == 0:
-            return (True, result.stdout.strip())
-        else:
-            return (False, result.stderr.strip() or "TrayRunner not running")
-            
-    except subprocess.TimeoutExpired:
-        return (False, "Status check timed out")
-    except Exception as e:
-        return (False, f"Status check failed: {e}")
+    if is_trayrunner_running():
+        return (True, "TrayRunner running (socket available)")
+    else:
+        return (False, "TrayRunner not running (socket not found)")
 
 
 class ReloadManager:
@@ -129,10 +147,10 @@ class ReloadManager:
         Returns:
             Tuple of (success, message)
         """
-        success, message = try_reload()
+        success, message = reload_trayrunner()
         
         self.last_reload_result = (success, message)
-        self.last_reload_time = __import__('time').time()
+        self.last_reload_time = time.time()
         
         return success, message
     

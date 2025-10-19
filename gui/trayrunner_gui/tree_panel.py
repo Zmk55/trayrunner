@@ -13,12 +13,14 @@ from PySide6.QtGui import QAction, QIcon, QDragEnterEvent, QDropEvent
 
 try:
     from trayrunner_gui.models.schema import Config, Node, ItemNode, GroupNode, SeparatorNode
+    from trayrunner_gui.models.utils import clone_node
 except ImportError:
     # Handle direct execution
     import sys
     from pathlib import Path
     sys.path.insert(0, str(Path(__file__).parent.parent))
     from trayrunner_gui.models.schema import Config, Node, ItemNode, GroupNode, SeparatorNode
+    from trayrunner_gui.models.utils import clone_node
 
 
 class ConfigTreeModel(QAbstractItemModel):
@@ -450,6 +452,61 @@ class ConfigTreeModel(QAbstractItemModel):
         
         parent_node = parent_index.internalPointer()
         return parent_node.id
+    
+    def generate_id(self) -> str:
+        """Generate a new unique ID"""
+        return str(uuid.uuid4())
+    
+    def children_of(self, parent_node) -> list:
+        """
+        Get the children list for a given parent node
+        
+        Args:
+            parent_node: Parent node (Root or GroupNode)
+            
+        Returns:
+            Mutable list of children
+        """
+        if parent_node is self.root or parent_node == "ROOT":
+            return self.root_items
+        elif isinstance(parent_node, GroupNode):
+            return parent_node.items
+        return []
+    
+    def unique_label(self, desired: str, parent_node=None) -> str:
+        """
+        Ensure label is unique among siblings
+        
+        Args:
+            desired: Desired label
+            parent_node: Parent node (None for root)
+            
+        Returns:
+            Unique label (may have counter appended)
+        """
+        if parent_node is None:
+            parent_node = self.root
+        
+        siblings = self.children_of(parent_node)
+        sibling_labels = [getattr(n, "label", "") for n in siblings if hasattr(n, "label")]
+        
+        if desired not in sibling_labels:
+            return desired
+        
+        # Add counter to make unique
+        counter = 2
+        while f"{desired} {counter}" in sibling_labels:
+            counter += 1
+        
+        return f"{desired} {counter}"
+    
+    def rebuild_parent_subtree(self, parent_id: str):
+        """Rebuild the subtree for a given parent"""
+        # For simplicity, reset the entire model
+        # This can be optimized to only rebuild specific parent
+        self.beginResetModel()
+        # root_items already updated in place
+        self.endResetModel()
 
 
 class TreePanel(QWidget):
@@ -634,6 +691,62 @@ class TreePanel(QWidget):
         if children:
             new_row = min(row, len(children) - 1)
             self.model._select_node_at(parent_id, new_row)
+    
+    def duplicate_selected(self):
+        """Duplicate the currently selected node"""
+        index = self.tree_view.currentIndex()
+        
+        if not index.isValid():
+            return
+        
+        # Get parent and current row
+        parent_index = index.parent()
+        current_row = index.row()
+        
+        # Get parent node (root or GroupNode)
+        if parent_index.isValid():
+            parent_node = self.model._node_from_index(parent_index)
+            parent_id = parent_node.id if parent_node else "ROOT"
+        else:
+            parent_node = self.model.root
+            parent_id = "ROOT"
+        
+        # Get the node to duplicate
+        source_node = self.model._node_from_index(index)
+        if not source_node:
+            return
+        
+        # Clone the node with new IDs and adjusted label
+        new_node = clone_node(
+            source_node,
+            self.model.generate_id,
+            lambda label: self.model.unique_label(label, parent_node)
+        )
+        
+        # Insert into backing list (right after current)
+        children = self.model.children_of(parent_node)
+        children.insert(current_row + 1, new_node)
+        
+        # Update Qt model
+        self.model.rebuild_parent_subtree(parent_id)
+        
+        # Select the new node
+        new_index = self.model.index(current_row + 1, 0, parent_index)
+        self.tree_view.setCurrentIndex(new_index)
+        self.tree_view.scrollTo(new_index)
+        
+        # Emit change signal for validation and unsaved changes
+        self.model.changed.emit()
+        
+        # Show status message
+        node_type = type(source_node).__name__.replace("Node", "")
+        status_msg = f"Duplicated {node_type}"
+        if hasattr(new_node, "label") and new_node.label:
+            status_msg += f": {new_node.label}"
+        
+        # Try to show status message if we have access to status bar
+        if hasattr(self, 'statusBar') and callable(getattr(self, 'statusBar')):
+            self.statusBar().showMessage(status_msg, 2000)
     
     def keyPressEvent(self, event):
         """Handle keyboard events"""

@@ -19,6 +19,10 @@ import tempfile
 import argparse
 import time
 import shutil
+import socket
+import threading
+import json
+from datetime import datetime
 
 __version__ = "1.0.0"
 from pathlib import Path
@@ -36,6 +40,13 @@ try:
     NOTIFY_AVAILABLE = True
 except (ImportError, ValueError):
     NOTIFY_AVAILABLE = False
+
+
+def _reload_sock_path() -> str:
+    """Get path to reload socket"""
+    base = os.path.expanduser("~/.local/state/trayrunner")
+    os.makedirs(base, exist_ok=True)
+    return os.path.join(base, "reload.sock")
 
 
 class ConfigLoader:
@@ -239,6 +250,10 @@ class TrayRunner:
         # Setup reload trigger file path
         self.reload_trigger_file = Path.home() / ".local" / "state" / "trayrunner" / "reload.trigger"
         self.reload_trigger_file.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Start reload socket server in background thread
+        self._reload_thread = threading.Thread(target=self._run_reload_server, daemon=True)
+        self._reload_thread.start()
     
     def _gui_log_path(self):
         """Get path to GUI launch log file"""
@@ -354,11 +369,72 @@ class TrayRunner:
         self.menu.show_all()
         return self.menu
     
-    def reload_config(self, widget):
+    def reload_config(self, widget=None):
         """Reload configuration and rebuild menu"""
         self.build_menu(None)
         self.indicator.set_menu(self.menu)
         self.command_runner._notify("TrayRunner", "Configuration reloaded")
+        return True
+    
+    def _run_reload_server(self):
+        """Run Unix socket server for reload requests"""
+        sock_path = _reload_sock_path()
+        
+        # Remove stale socket
+        try:
+            os.unlink(sock_path)
+        except FileNotFoundError:
+            pass
+        
+        # Create Unix socket
+        server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        try:
+            server.bind(sock_path)
+            server.listen(1)
+            self._log_info(f"Reload socket listening: {sock_path}")
+            
+            while True:
+                conn, _ = server.accept()
+                try:
+                    data = conn.recv(1024).decode("utf-8").strip()
+                    if data == "RELOAD":
+                        # Schedule reload on main thread
+                        Gtk.idle_add(self._handle_socket_reload, conn)
+                    else:
+                        conn.close()
+                except Exception as e:
+                    self._log_error(f"Socket error: {e}")
+                    conn.close()
+        except Exception as e:
+            self._log_error(f"Reload server error: {e}")
+        finally:
+            server.close()
+    
+    def _handle_socket_reload(self, conn):
+        """Handle reload on main GTK thread"""
+        try:
+            ok = self.reload_config()
+            response = json.dumps({"ok": bool(ok)})
+            conn.send(response.encode("utf-8"))
+        except Exception as e:
+            self._log_error(f"Reload handler error: {e}")
+        finally:
+            conn.close()
+        return False  # Don't repeat
+    
+    def _log_info(self, msg: str):
+        """Log info message"""
+        log_path = self._gui_log_path()
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open(log_path, "a") as f:
+            f.write(f"[{timestamp}] INFO: {msg}\n")
+    
+    def _log_error(self, msg: str):
+        """Log error message"""
+        log_path = self._gui_log_path()
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open(log_path, "a") as f:
+            f.write(f"[{timestamp}] ERROR: {msg}\n")
     
     def open_config(self, widget):
         """Open config file in default editor"""

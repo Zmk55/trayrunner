@@ -22,6 +22,7 @@ try:
     from trayrunner_gui.models.validators import config_validator
     from trayrunner_gui.services.reloader import reload_manager
     from trayrunner_gui.services.file_watch import ConfigFileWatcher
+    from trayrunner_gui.services.save_coordinator import save_coordinator
 except ImportError:
     # Handle direct execution
     import sys
@@ -34,6 +35,7 @@ except ImportError:
     from trayrunner_gui.models.validators import config_validator
     from trayrunner_gui.services.reloader import reload_manager
     from trayrunner_gui.services.file_watch import ConfigFileWatcher
+    from trayrunner_gui.services.save_coordinator import save_coordinator
 
 
 class ValidationPanel(QDockWidget):
@@ -210,7 +212,8 @@ class MainWindow(QMainWindow):
         edit_menu.addSeparator()
         
         self.duplicate_action = QAction("&Duplicate", self)
-        self.duplicate_action.triggered.connect(self.duplicate_item)
+        self.duplicate_action.setShortcut(QKeySequence("Ctrl+D"))
+        self.duplicate_action.triggered.connect(self.tree_panel.duplicate_selected)
         edit_menu.addAction(self.duplicate_action)
         
         self.delete_action = QAction("&Delete", self)
@@ -317,7 +320,10 @@ class MainWindow(QMainWindow):
             return
         
         try:
-            # Pause file watcher before save
+            # Coordinate save to suppress self-triggered events
+            save_coordinator.begin_save(self.config_path)
+            
+            # Pause file watcher as additional safety
             if self.file_watcher:
                 self.file_watcher.pause()
             
@@ -326,6 +332,9 @@ class MainWindow(QMainWindow):
                 self.config, 
                 self.original_yaml
             )
+            
+            # Mark save complete with file stats
+            save_coordinator.end_save(self.config_path)
             
             # Update original YAML for future saves
             _, self.original_yaml = yaml_handler.load_yaml(self.config_path)
@@ -343,23 +352,19 @@ class MainWindow(QMainWindow):
             
             prefs = load_prefs()
             if prefs.get("reload_after_save", True):
-                # Non-blocking reload with status update
                 ok, msg = try_reload()
                 if ok:
                     self.status_bar.showMessage(f"Saved & reloaded: {msg}", 4000)
                 else:
-                    # Show warning but don't block - reload is optional
                     self.status_bar.showMessage(f"Saved (reload warning: {msg})", 6000)
             
-            # Resume file watcher after a short delay (debounce)
-            if self.file_watcher:
-                QTimer.singleShot(200, self.file_watcher.resume)
-        
         except Exception as e:
-            # Make sure to resume watcher even on error
+            QMessageBox.critical(self, "Save Error", f"Failed to save configuration:\n{e}")
+        
+        finally:
+            # Resume file watcher after longer delay
             if self.file_watcher:
-                self.file_watcher.resume()
-            QMessageBox.critical(self, "Save Error", f"Failed to save configuration: {e}")
+                QTimer.singleShot(500, self.file_watcher.resume)
     
     def save_as_config(self):
         """Save configuration to new file"""
@@ -559,11 +564,26 @@ Built with PySide6, ruamel.yaml, and pydantic."""
     
     def on_external_file_change(self, file_path):
         """Handle external file change"""
+        
+        # If no unsaved changes, silently reload
+        if not self.has_unsaved_changes:
+            try:
+                self.load_config_file(Path(file_path))
+                self.status_bar.showMessage("Configuration reloaded (external change detected)", 3000)
+            except Exception as e:
+                QMessageBox.warning(
+                    self, "Reload Failed",
+                    f"Failed to reload externally modified file:\n{e}"
+                )
+            return
+        
+        # Has unsaved changes - prompt user
         reply = QMessageBox.question(
             self, "File Changed Externally",
             f"The configuration file has been modified externally:\n{file_path}\n\n"
-            "Do you want to reload it? (This will discard your unsaved changes.)",
-            QMessageBox.Yes | QMessageBox.No
+            "You have unsaved changes. Do you want to reload the file and discard your changes?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
         )
         
         if reply == QMessageBox.Yes:
