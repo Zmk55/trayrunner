@@ -6,10 +6,12 @@ from typing import Optional, Any, Dict
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit,
     QCheckBox, QTableWidget, QTableWidgetItem, QPushButton,
-    QLabel, QStackedWidget, QGroupBox, QHeaderView, QMessageBox
+    QLabel, QStackedWidget, QGroupBox, QHeaderView, QMessageBox,
+    QFileDialog
 )
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QIcon, QPixmap
+import os
 
 try:
     from trayrunner_gui.models.schema import ItemNode, GroupNode, SeparatorNode
@@ -36,67 +38,114 @@ class ItemEditor(QWidget):
     def setup_ui(self):
         """Setup the UI"""
         layout = QVBoxLayout(self)
-        
+
         # Form layout for item properties
         form_layout = QFormLayout()
-        
+
         # Label field
         self.label_edit = QLineEdit()
         self.label_edit.setPlaceholderText("Enter item label")
         form_layout.addRow("Label:", self.label_edit)
-        
+
         # Command field
         self.cmd_edit = QLineEdit()
         self.cmd_edit.setPlaceholderText("Enter command to execute")
         form_layout.addRow("Command:", self.cmd_edit)
-        
+
         # Terminal checkbox
         self.terminal_check = QCheckBox("Run in terminal")
         form_layout.addRow("", self.terminal_check)
-        
+
         # Confirm checkbox
         self.confirm_check = QCheckBox("Show confirmation dialog")
         form_layout.addRow("", self.confirm_check)
-        
+
         layout.addLayout(form_layout)
-        
+
         # Environment variables section
         env_group = QGroupBox("Environment Variables")
         env_layout = QVBoxLayout(env_group)
-        
+
         # Environment variables table
         self.env_table = QTableWidget()
         self.env_table.setColumnCount(2)
         self.env_table.setHorizontalHeaderLabels(["Key", "Value"])
-        
+
         # Setup table
         header = self.env_table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.Stretch)
-        
+
         env_layout.addWidget(self.env_table)
-        
+
         # Environment variables buttons
         env_btn_layout = QHBoxLayout()
-        
+
         self.add_env_btn = QPushButton("Add Variable")
         self.add_env_btn.clicked.connect(self.add_env_var)
         env_btn_layout.addWidget(self.add_env_btn)
-        
+
         self.remove_env_btn = QPushButton("Remove Selected")
         self.remove_env_btn.clicked.connect(self.remove_env_var)
         env_btn_layout.addWidget(self.remove_env_btn)
-        
+
         env_btn_layout.addStretch()
         env_layout.addLayout(env_btn_layout)
-        
+
         layout.addWidget(env_group)
+
+        # Working Directory section (placed AFTER environment variables)
+        working_dir_group = QGroupBox("Working Directory")
+        working_dir_group_layout = QVBoxLayout(working_dir_group)
+        working_dir_group_layout.setSpacing(8)
+
+        # Working directory field with browse button
+        working_dir_input_layout = QHBoxLayout()
+        working_dir_input_layout.setSpacing(6)
+
+        self.working_dir_edit = QLineEdit()
+        self.working_dir_edit.setPlaceholderText("Optional: Directory to run command in (supports ~ and $VAR)")
+        self.working_dir_edit.setToolTip(
+            "The directory where the command will be executed.\n"
+            "If empty, the command runs in its default directory.\n\n"
+            "Supports:\n"
+            "  ~ for home directory\n"
+            "  $VAR or ${VAR} for environment variables"
+        )
+        working_dir_input_layout.addWidget(self.working_dir_edit, 1)  # Stretch factor 1
+
+        self.browse_dir_btn = QPushButton("Browse...")
+        self.browse_dir_btn.setMaximumWidth(100)
+        self.browse_dir_btn.setToolTip("Select a directory from filesystem")
+        self.browse_dir_btn.clicked.connect(self.browse_working_dir)
+        working_dir_input_layout.addWidget(self.browse_dir_btn, 0)  # No stretch
+
+        working_dir_group_layout.addLayout(working_dir_input_layout)
+
+        # Warning label for non-existent directories
+        self.working_dir_warning = QLabel()
+        self.working_dir_warning.setWordWrap(True)
+        self.working_dir_warning.setStyleSheet(
+            "QLabel { "
+            "  color: #856404; "
+            "  background-color: #fff3cd; "
+            "  border: 1px solid #ffeaa7; "
+            "  border-radius: 4px; "
+            "  padding: 6px 10px; "
+            "  font-size: 11px; "
+            "}"
+        )
+        self.working_dir_warning.hide()  # Hidden by default
+        working_dir_group_layout.addWidget(self.working_dir_warning)
+
+        layout.addWidget(working_dir_group)
         layout.addStretch()
     
     def setup_connections(self):
         """Setup signal connections"""
         self.label_edit.textChanged.connect(self.on_data_changed)
         self.cmd_edit.textChanged.connect(self.on_data_changed)
+        self.working_dir_edit.textChanged.connect(self.on_working_dir_changed)
         self.terminal_check.toggled.connect(self.on_data_changed)
         self.confirm_check.toggled.connect(self.on_data_changed)
         self.env_table.itemChanged.connect(self.on_data_changed)
@@ -104,36 +153,45 @@ class ItemEditor(QWidget):
     def set_item(self, item: ItemNode):
         """Set the item to edit"""
         self.current_item = item
-        
+
         # Update fields
         self.label_edit.setText(item.label)
         self.cmd_edit.setText(item.cmd)
+        self.working_dir_edit.setText(item.working_dir or "")
         self.terminal_check.setChecked(item.terminal)
         self.confirm_check.setChecked(item.confirm)
-        
+
         # Update environment variables table
         self.update_env_table()
+
+        # Validate working directory
+        self.validate_working_dir()
     
     def get_item(self) -> ItemNode:
         """Get the current item data"""
         if not self.current_item:
             return ItemNode(label="", cmd="")
-        
+
         # Get environment variables from table
         env_vars = {}
         for row in range(self.env_table.rowCount()):
             key_item = self.env_table.item(row, 0)
             value_item = self.env_table.item(row, 1)
-            
+
             if key_item and value_item:
                 key = key_item.text().strip()
                 value = value_item.text().strip()
                 if key:
                     env_vars[key] = value
-        
+
+        # Get working directory, use None if empty
+        working_dir = self.working_dir_edit.text().strip()
+        working_dir = working_dir if working_dir else None
+
         return ItemNode(
             label=self.label_edit.text().strip(),
             cmd=self.cmd_edit.text().strip(),
+            working_dir=working_dir,
             terminal=self.terminal_check.isChecked(),
             confirm=self.confirm_check.isChecked(),
             env=env_vars
@@ -164,7 +222,69 @@ class ItemEditor(QWidget):
         if current_row >= 0:
             self.env_table.removeRow(current_row)
             self.on_data_changed()
-    
+
+    def browse_working_dir(self):
+        """Open directory browser dialog"""
+        # Start from current working_dir if set, otherwise use home directory
+        start_dir = self.working_dir_edit.text().strip()
+
+        # Expand path variables to check if directory exists
+        if start_dir:
+            expanded_dir = os.path.expanduser(os.path.expandvars(start_dir))
+            if os.path.isdir(expanded_dir):
+                start_dir = expanded_dir
+            else:
+                start_dir = os.path.expanduser("~")
+        else:
+            start_dir = os.path.expanduser("~")
+
+        directory = QFileDialog.getExistingDirectory(
+            self,
+            "Select Working Directory",
+            start_dir,
+            QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks
+        )
+
+        if directory:
+            self.working_dir_edit.setText(directory)
+            # on_working_dir_changed will be called automatically via signal
+
+    def validate_working_dir(self):
+        """Validate the working directory and show warning if needed"""
+        working_dir = self.working_dir_edit.text().strip()
+
+        # If empty, hide warning (empty is valid - means use default)
+        if not working_dir:
+            self.working_dir_warning.hide()
+            return
+
+        # Expand user home (~) and environment variables ($VAR, ${VAR})
+        expanded_dir = os.path.expanduser(os.path.expandvars(working_dir))
+
+        # Check if the expanded directory exists
+        if not os.path.isdir(expanded_dir):
+            # Show non-blocking warning
+            if working_dir != expanded_dir:
+                # Path contains variables that were expanded
+                self.working_dir_warning.setText(
+                    f"Warning: Directory does not exist yet\n"
+                    f"Expanded path: {expanded_dir}"
+                )
+            else:
+                # Simple path without variables
+                self.working_dir_warning.setText(
+                    "Warning: Directory does not exist yet"
+                )
+            self.working_dir_warning.show()
+        else:
+            # Directory exists - hide warning
+            self.working_dir_warning.hide()
+
+    def on_working_dir_changed(self):
+        """Handle working directory text change"""
+        self.validate_working_dir()
+        self.on_data_changed()
+
     def on_data_changed(self):
         """Handle data change"""
         if self.current_item:
@@ -172,10 +292,11 @@ class ItemEditor(QWidget):
             new_item = self.get_item()
             self.current_item.label = new_item.label
             self.current_item.cmd = new_item.cmd
+            self.current_item.working_dir = new_item.working_dir
             self.current_item.terminal = new_item.terminal
             self.current_item.confirm = new_item.confirm
             self.current_item.env = new_item.env
-            
+
             self.data_changed.emit()
 
 

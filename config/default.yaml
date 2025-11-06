@@ -59,6 +59,8 @@ items:
         cmd: "git status"
         terminal: true
         confirm: false
+        # Optional: specify working directory for commands
+        # working_dir: "~/Projects/myrepo"
 
       - type: item
         label: "Python Version"
