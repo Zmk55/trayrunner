@@ -76,7 +76,7 @@ Both components enforce single-instance:
 - **Default template**: `config/default.yaml`
 - **Test config**: `config/test.yaml` (gitignored)
 - **Schema**: Pydantic models in `gui/trayrunner_gui/models/schema.py` define three node types:
-  - `ItemNode`: Executable command with label, cmd, terminal, confirm, env
+  - `ItemNode`: Executable command with label, cmd, terminal, confirm, env, working_dir
   - `GroupNode`: Submenu containing nested items
   - `SeparatorNode`: Visual separator
 - **YAML handling**: Uses `ruamel.yaml` to preserve comments/formatting during round-trip edits
