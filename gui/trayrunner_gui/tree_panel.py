@@ -6,8 +6,8 @@ from typing import Optional, Any, Dict, List
 import json
 import uuid
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QTreeView, QLineEdit,
-    QPushButton, QMenu, QMessageBox, QInputDialog
+    QWidget, QVBoxLayout, QTreeView,
+    QMenu, QMessageBox, QInputDialog
 )
 from PySide6.QtCore import Qt, QAbstractItemModel, QModelIndex, Signal, QMimeData, QByteArray
 from PySide6.QtGui import QAction, QIcon, QDragEnterEvent, QDropEvent
@@ -546,17 +546,6 @@ class TreePanel(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         
-        # Search box
-        search_layout = QHBoxLayout()
-        self.search_edit = QLineEdit()
-        self.search_edit.setPlaceholderText("Search items...")
-        search_layout.addWidget(self.search_edit)
-        
-        self.clear_search_btn = QPushButton("Clear")
-        self.clear_search_btn.clicked.connect(self.clear_search)
-        search_layout.addWidget(self.clear_search_btn)
-        
-        layout.addLayout(search_layout)
         
         # Tree view with proper DnD settings
         self.tree_view = QTreeView()
@@ -577,7 +566,6 @@ class TreePanel(QWidget):
         """Setup signal connections"""
         # Only connect non-model dependent signals here
         self.tree_view.customContextMenuRequested.connect(self.show_context_menu)
-        self.search_edit.textChanged.connect(self.filter_tree)
     
     def set_config(self, config: Config):
         """Set the configuration to display"""
@@ -945,11 +933,4 @@ class TreePanel(QWidget):
         # Emit custom signal for save/validation
         self.model.changed.emit()
     
-    def filter_tree(self, text):
-        """Filter tree based on search text"""
-        # TODO: Implement tree filtering
-        pass
     
-    def clear_search(self):
-        """Clear search text"""
-        self.search_edit.clear()

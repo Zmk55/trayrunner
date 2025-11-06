@@ -29,6 +29,7 @@ class ItemNode(BaseModel):
     terminal: bool = Field(False, description="Run command in terminal")
     confirm: bool = Field(False, description="Show confirmation dialog before execution")
     env: Dict[str, str] = Field(default_factory=dict, description="Environment variables")
+    working_dir: Optional[str] = Field(None, description="Working directory for command execution")
     
     @field_validator('label')
     @classmethod

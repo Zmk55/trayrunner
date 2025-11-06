@@ -75,7 +75,7 @@ setup_user_config() {
     
     # Copy default config if it doesn't exist
     if [[ ! -f "$HOME/.config/trayrunner/commands.yaml" ]]; then
-        cp "$SCRIPT_DIR/config/commands.yaml" "$HOME/.config/trayrunner/"
+        cp "$SCRIPT_DIR/config/default.yaml" "$HOME/.config/trayrunner/commands.yaml"
         echo -e "${GREEN}Default configuration copied to ~/.config/trayrunner/commands.yaml${NC}"
     else
         echo -e "${YELLOW}Configuration file already exists at ~/.config/trayrunner/commands.yaml${NC}"

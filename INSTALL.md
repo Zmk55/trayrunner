@@ -144,12 +144,13 @@ items:
         terminal: false
         confirm: false
         env: {}
-      
+
       - type: item
         label: "Git Status"
         cmd: "git status"
         terminal: true
         confirm: false
+        working_dir: "~/Projects/myapp"
         env: {}
 
   - type: separator
@@ -162,15 +163,39 @@ items:
     env: {}
 ```
 
+### Working Directory
+
+Commands can execute in specific directories using the `working_dir` field:
+
+```yaml
+- type: item
+  label: "Run Tests"
+  cmd: "pytest -v"
+  terminal: true
+  working_dir: "~/Projects/myapp"
+```
+
+**Features:**
+- **Path expansion**: Supports `~` for home directory and `$VAR`/`${VAR}` for environment variables
+- **Validation**: TrayRunner validates that the directory exists before executing
+- **GUI support**: Use the Browse button in the GUI editor to select directories visually
+- **Error handling**: Clear error notifications if directory doesn't exist or isn't accessible
+
+**Common use cases:**
+- Running git commands in specific repositories
+- Building projects in their root directories
+- Running scripts that depend on their location
+
 ### Environment Variables
 
 You can set environment variables for commands:
 
 ```yaml
 - type: item
-  label: "Custom Project"
-  cmd: "cd /path/to/project && make"
+  label: "Custom Project Build"
+  cmd: "make build"
   terminal: true
+  working_dir: "$PROJECT_ROOT"
   env:
     PROJECT_ROOT: "/path/to/project"
     BUILD_TYPE: "release"

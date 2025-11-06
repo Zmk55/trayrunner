@@ -61,6 +61,7 @@ logs/
 # User-specific files
 user_config/
 *.local
+config/test.yaml
 
 # Temporary files
 *.tmp

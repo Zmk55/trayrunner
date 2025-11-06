@@ -1,0 +1,188 @@
+# Example TrayRunner configuration demonstrating working_dir feature
+#
+# Copy this to ~/.config/trayrunner/commands.yaml to use
+# Or add individual items to your existing config
+
+items:
+  # Example 1: Basic working directory usage
+  - type: item
+    label: "Show Directory Contents"
+    cmd: "ls -la"
+    working_dir: "/tmp"
+    terminal: true
+    confirm: false
+    env: {}
+
+  # Example 2: Tilde expansion (home directory)
+  - type: item
+    label: "Home Directory Listing"
+    cmd: "ls -la"
+    working_dir: "~/Downloads"
+    terminal: true
+    confirm: false
+    env: {}
+
+  # Example 3: Environment variable expansion
+  - type: item
+    label: "Check Project Status"
+    cmd: "git status"
+    working_dir: "$HOME/projects/myproject"
+    terminal: true
+    confirm: false
+    env: {}
+
+  # Example 4: Combined with custom environment variables
+  - type: item
+    label: "Run Development Server"
+    cmd: "npm run dev"
+    working_dir: "$PROJECT_ROOT"
+    terminal: true
+    confirm: false
+    env:
+      PROJECT_ROOT: "/home/user/my-web-app"
+      NODE_ENV: "development"
+
+  # Example 5: Group of related commands with different directories
+  - type: group
+    label: "Git Projects"
+    items:
+      - type: item
+        label: "Project A - Status"
+        cmd: "git status"
+        working_dir: "~/projects/project-a"
+        terminal: true
+
+      - type: item
+        label: "Project A - Pull Latest"
+        cmd: "git pull"
+        working_dir: "~/projects/project-a"
+        terminal: true
+
+      - type: separator
+
+      - type: item
+        label: "Project B - Status"
+        cmd: "git status"
+        working_dir: "~/projects/project-b"
+        terminal: true
+
+      - type: item
+        label: "Project B - Pull Latest"
+        cmd: "git pull"
+        working_dir: "~/projects/project-b"
+        terminal: true
+
+  # Example 6: System administration tasks
+  - type: group
+    label: "System Admin"
+    items:
+      - type: item
+        label: "View System Logs"
+        cmd: "tail -f syslog"
+        working_dir: "/var/log"
+        terminal: true
+
+      - type: item
+        label: "Check Log Sizes"
+        cmd: "du -sh *"
+        working_dir: "/var/log"
+        terminal: true
+
+  # Example 7: Build commands
+  - type: group
+    label: "Build Tasks"
+    items:
+      - type: item
+        label: "Clean Build"
+        cmd: "make clean"
+        working_dir: "~/projects/c-project"
+        terminal: true
+        confirm: true  # Ask before cleaning
+
+      - type: item
+        label: "Build Project"
+        cmd: "make all"
+        working_dir: "~/projects/c-project"
+        terminal: true
+
+      - type: item
+        label: "Run Tests"
+        cmd: "make test"
+        working_dir: "~/projects/c-project"
+        terminal: true
+
+  # Example 8: Database commands
+  - type: group
+    label: "Database"
+    items:
+      - type: item
+        label: "Backup Database"
+        cmd: "./scripts/backup.sh"
+        working_dir: "$DB_PROJECT"
+        terminal: false
+        confirm: true
+        env:
+          DB_PROJECT: "/opt/myapp"
+          BACKUP_DIR: "/var/backups/db"
+
+      - type: item
+        label: "Check Database Status"
+        cmd: "systemctl status postgresql"
+        working_dir: "/tmp"  # Any directory, command doesn't depend on cwd
+        terminal: true
+
+  # Example 9: Docker commands
+  - type: group
+    label: "Docker Services"
+    items:
+      - type: item
+        label: "Start Services"
+        cmd: "docker-compose up -d"
+        working_dir: "~/docker/services"
+        terminal: true
+
+      - type: item
+        label: "View Logs"
+        cmd: "docker-compose logs -f"
+        working_dir: "~/docker/services"
+        terminal: true
+
+      - type: item
+        label: "Stop Services"
+        cmd: "docker-compose down"
+        working_dir: "~/docker/services"
+        terminal: true
+        confirm: true
+
+  # Example 10: Python development
+  - type: group
+    label: "Python Project"
+    items:
+      - type: item
+        label: "Run Tests"
+        cmd: "pytest tests/ -v"
+        working_dir: "~/projects/python-app"
+        terminal: true
+
+      - type: item
+        label: "Run Linter"
+        cmd: "black src/ && isort src/"
+        working_dir: "~/projects/python-app"
+        terminal: true
+
+      - type: item
+        label: "Start App"
+        cmd: "python -m myapp.app"
+        working_dir: "~/projects/python-app"
+        terminal: true
+        env:
+          PYTHONPATH: "."
+
+  # Example 11: Backward compatibility - no working_dir
+  - type: item
+    label: "System Info (No Working Dir)"
+    cmd: "uname -a"
+    terminal: true
+    confirm: false
+    env: {}
+    # Note: working_dir is optional and can be omitted

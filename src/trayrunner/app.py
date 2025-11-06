@@ -54,7 +54,7 @@ class ConfigLoader:
     
     def __init__(self):
         self.config_dir = Path.home() / ".config" / "trayrunner"
-        self.default_config = Path(__file__).parent.parent.parent / "config" / "commands.yaml"
+        self.default_config = Path(__file__).parent.parent.parent / "config" / "default.yaml"
         self.user_config = self.config_dir / "commands.yaml"
         
     def ensure_user_config(self):
@@ -131,12 +131,37 @@ class CommandRunner:
         if item.get("confirm", False):
             if not self._confirm_execution(item["label"], parent_window):
                 return
-        
+
         # Merge environment variables
         env = os.environ.copy()
         if "env" in item:
             env.update(item["env"])
-        
+
+        # Get working directory if specified
+        working_dir = item.get("working_dir")
+        if working_dir:
+            # Expand user home directory and environment variables
+            working_dir = os.path.expanduser(os.path.expandvars(working_dir))
+
+            # Validate that directory exists and is accessible
+            if not os.path.exists(working_dir):
+                error_msg = f"Working directory does not exist: {working_dir}"
+                logging.error(f"Command '{item['label']}': {error_msg}")
+                self._notify("TrayRunner Error", error_msg, "error")
+                return
+
+            if not os.path.isdir(working_dir):
+                error_msg = f"Working directory path is not a directory: {working_dir}"
+                logging.error(f"Command '{item['label']}': {error_msg}")
+                self._notify("TrayRunner Error", error_msg, "error")
+                return
+
+            if not os.access(working_dir, os.R_OK | os.X_OK):
+                error_msg = f"Working directory is not accessible: {working_dir}"
+                logging.error(f"Command '{item['label']}': {error_msg}")
+                self._notify("TrayRunner Error", error_msg, "error")
+                return
+
         # Prepare command
         cmd = item["cmd"]
         if item.get("terminal", False):
@@ -146,29 +171,32 @@ class CommandRunner:
             else:
                 self._notify("TrayRunner Error", "No terminal emulator found", "error")
                 return
-        
+
         # Show start notification
         self._notify("TrayRunner", f"Started: {item['label']}")
-        
+
         try:
             # Execute command
             if item.get("terminal", False):
                 # For terminal commands, use shell=True
-                process = subprocess.Popen(cmd, shell=True, env=env)
+                process = subprocess.Popen(cmd, shell=True, env=env, cwd=working_dir)
             else:
                 # Try to split command, fallback to shell if needed
                 try:
                     cmd_parts = shlex.split(cmd)
-                    process = subprocess.Popen(cmd_parts, env=env, 
-                                            stdout=subprocess.PIPE, 
+                    process = subprocess.Popen(cmd_parts, env=env, cwd=working_dir,
+                                            stdout=subprocess.PIPE,
                                             stderr=subprocess.PIPE)
                 except (ValueError, FileNotFoundError):
-                    process = subprocess.Popen(cmd, shell=True, env=env,
-                                            stdout=subprocess.PIPE, 
+                    process = subprocess.Popen(cmd, shell=True, env=env, cwd=working_dir,
+                                            stdout=subprocess.PIPE,
                                             stderr=subprocess.PIPE)
             
             # Log the execution
-            logging.info(f"Started command: {item['label']} -> {cmd}")
+            log_msg = f"Started command: {item['label']} -> {cmd}"
+            if working_dir:
+                log_msg += f" (cwd: {working_dir})"
+            logging.info(log_msg)
             
             # For non-terminal commands, check exit status
             if not item.get("terminal", False):
