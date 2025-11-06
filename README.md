@@ -46,6 +46,7 @@ sudo apt install libayatana-appindicator3-1
 - **Auto-Reload**: Changes apply immediately
 - **Smart Backup**: Automatic timestamped backups
 - **File Watching**: Detects external changes to your config
+- **Working Directory Support**: Run commands in specific directories
 
 ## 🐛 Troubleshooting
 
@@ -76,6 +77,26 @@ EOF
 - **Location**: `~/.config/trayrunner/commands.yaml`
 - **Edit**: Use the GUI (recommended) or edit manually
 - **Backup**: Automatic backups created on save
+
+### Working Directory Example
+
+Commands can be executed in specific directories using the `working_dir` field:
+
+```yaml
+items:
+  - type: item
+    label: "Git Status"
+    cmd: "git status"
+    terminal: true
+    working_dir: "~/Projects/myapp"
+```
+
+The `working_dir` field supports:
+- `~` for home directory expansion
+- `$VAR` or `${VAR}` for environment variables
+- Absolute and relative paths
+
+Set this field in the GUI editor under the "Working Directory" section with a convenient browse button.
 
 **📖 [INSTALL.md](INSTALL.md)** - Traditional installation methods for advanced users
 
